@@ -52,35 +52,6 @@ To build a **web-based booking system** that allows students to book vehicles on
 
 ---
 
-## 🏗️ Tech Stack
-
-- **Frontend:** HTML, CSS, JavaScript  
-  *(UI/UX designed using Figma)*  
-- **Backend:** Python  
-- **Database:** MongoDB  
-- **Authentication:** JWT / Session-based  
-
----
-
-## 📂 Project Structure (Example)
-
-```
-/frontend
-  ├── index.html
-  ├── booking.html
-  └── styles.css
-
-/backend
-  ├── app.py
-  ├── routes/
-  ├── models/
-  └── config/
-
-README.md
-```
-
----
-
 ## 📄 License
 
 This project is created for academic and learning purposes.
