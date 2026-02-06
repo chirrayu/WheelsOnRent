@@ -6,12 +6,26 @@ import { Label } from '../ui/label';
 import { Badge } from '../ui/badge';
 import { Save, Bike, MapPin } from 'lucide-react';
 import { getStoredData, setStoredData } from '../../utils/mockData';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+
+interface Location {
+  id: string;
+  name: string;
+  address: string;
+}
+
+interface Pricing {
+  id?: string;
+  locationId: string;
+  vehicleType: string;
+  pricePerHour: number;
+  pricePerDay: number;
+}
 
 export default function PriceUpdate() {
-  const [locations, setLocations] = useState([]);
-  const [pricing, setPricing] = useState([]);
-  const [editedPrices, setEditedPrices] = useState({});
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [pricing, setPricing] = useState<Pricing[]>([]);
+  const [editedPrices, setEditedPrices] = useState<Record<string, Partial<Pricing>>>({});
 
   useEffect(() => {
     loadData();
@@ -26,15 +40,15 @@ export default function PriceUpdate() {
 
   const getPriceForLocation = (locationId: string, vehicleType: string) => {
     const price = pricing.find(
-      (p: any) => p.locationId === locationId && p.vehicleType === vehicleType
+      (p) => p.locationId === locationId && p.vehicleType === vehicleType
     );
     return price || { pricePerHour: 0, pricePerDay: 0 };
   };
 
-  const handlePriceChange = (locationId: string, vehicleType: string, field: string, value: string) => {
+  const handlePriceChange = (locationId: string, vehicleType: string, field: 'pricePerHour' | 'pricePerDay', value: string) => {
     const key = `${locationId}-${vehicleType}`;
     const currentPrice = getPriceForLocation(locationId, vehicleType);
-    
+
     setEditedPrices({
       ...editedPrices,
       [key]: {
@@ -48,22 +62,27 @@ export default function PriceUpdate() {
 
   const savePrices = () => {
     const updatedPricing = [...pricing];
-    
-    Object.values(editedPrices).forEach((editedPrice: any) => {
+
+    Object.values(editedPrices).forEach((editedPrice) => {
+      if (!editedPrice.locationId || !editedPrice.vehicleType) return;
+
       const index = updatedPricing.findIndex(
-        (p: any) => p.locationId === editedPrice.locationId && p.vehicleType === editedPrice.vehicleType
+        (p) => p.locationId === editedPrice.locationId && p.vehicleType === editedPrice.vehicleType
       );
-      
+
       if (index !== -1) {
         updatedPricing[index] = {
           ...updatedPricing[index],
-          pricePerHour: editedPrice.pricePerHour,
-          pricePerDay: editedPrice.pricePerDay
+          pricePerHour: editedPrice.pricePerHour ?? updatedPricing[index].pricePerHour,
+          pricePerDay: editedPrice.pricePerDay ?? updatedPricing[index].pricePerDay
         };
       } else {
         updatedPricing.push({
           id: Date.now().toString(),
-          ...editedPrice
+          locationId: editedPrice.locationId,
+          vehicleType: editedPrice.vehicleType,
+          pricePerHour: editedPrice.pricePerHour || 0,
+          pricePerDay: editedPrice.pricePerDay || 0
         });
       }
     });
@@ -74,13 +93,14 @@ export default function PriceUpdate() {
     toast.success('Prices updated successfully!');
   };
 
-  const getCurrentPrice = (locationId: string, vehicleType: string, field: string) => {
+  const getCurrentPrice = (locationId: string, vehicleType: string, field: 'pricePerHour' | 'pricePerDay') => {
     const key = `${locationId}-${vehicleType}`;
     if (editedPrices[key]) {
-      return editedPrices[key][field];
+      const val = editedPrices[key][field];
+      if (val !== undefined) return val;
     }
     const price = getPriceForLocation(locationId, vehicleType);
-    return price[field];
+    return (price as any)[field];
   };
 
   const hasChanges = Object.keys(editedPrices).length > 0;
@@ -101,7 +121,7 @@ export default function PriceUpdate() {
       </div>
 
       <div className="grid gap-6">
-        {locations.map((location: any) => (
+        {locations.map((location) => (
           <Card key={location.id}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

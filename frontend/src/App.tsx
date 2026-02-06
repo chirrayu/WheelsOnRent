@@ -6,28 +6,26 @@ import Register from './pages/Register';
 import AdminPanel from './pages/AdminPanel';
 import UserPortal from './pages/UserPortal';
 import MyTeamPanel from './pages/MyTeamPanel';
+import { User } from './utils/mockData';
 
 export default function App() {
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is logged in
-    const storedUser = localStorage.getItem('currentUser');
-    if (storedUser) {
-      setCurrentUser(JSON.parse(storedUser));
-    }
+    // TODO: Check authentication status with backend API
+    // For now, just set loading to false
     setIsLoading(false);
   }, []);
 
-  const handleLogin = (user) => {
+  const handleLogin = (user: User) => {
     setCurrentUser(user);
-    localStorage.setItem('currentUser', JSON.stringify(user));
+    // TODO: Store authentication token from backend
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
-    localStorage.removeItem('currentUser');
+    // TODO: Clear authentication token and call logout API
   };
 
   if (isLoading) {
@@ -42,77 +40,77 @@ export default function App() {
     <>
       <Router>
         <Routes>
-          <Route 
-            path="/login" 
+          <Route
+            path="/login"
             element={
               currentUser ? (
                 <Navigate to={
                   currentUser.role === 'admin' ? '/admin' :
-                  currentUser.role === 'team' ? '/team' :
-                  '/user'
+                    currentUser.role === 'team' ? '/team' :
+                      '/user'
                 } replace />
               ) : (
                 <Login onLogin={handleLogin} />
               )
-            } 
+            }
           />
-          <Route 
-            path="/register" 
+          <Route
+            path="/register"
             element={
               currentUser ? (
                 <Navigate to={
                   currentUser.role === 'admin' ? '/admin' :
-                  currentUser.role === 'team' ? '/team' :
-                  '/user'
+                    currentUser.role === 'team' ? '/team' :
+                      '/user'
                 } replace />
               ) : (
                 <Register onRegister={handleLogin} />
               )
-            } 
+            }
           />
-          <Route 
-            path="/admin/*" 
+          <Route
+            path="/admin/*"
             element={
               currentUser?.role === 'admin' ? (
                 <AdminPanel user={currentUser} onLogout={handleLogout} />
               ) : (
                 <Navigate to="/login" replace />
               )
-            } 
+            }
           />
-          <Route 
-            path="/user/*" 
+          <Route
+            path="/user/*"
             element={
               currentUser?.role === 'user' ? (
                 <UserPortal user={currentUser} onLogout={handleLogout} />
               ) : (
                 <Navigate to="/login" replace />
               )
-            } 
+            }
           />
-          <Route 
-            path="/team/*" 
+          <Route
+            path="/team/*"
             element={
               currentUser?.role === 'team' ? (
                 <MyTeamPanel user={currentUser} onLogout={handleLogout} />
               ) : (
                 <Navigate to="/login" replace />
               )
-            } 
+            }
           />
-          <Route 
-            path="/" 
+          <Route
+            path="/"
             element={
               currentUser ? (
                 <Navigate to={
                   currentUser.role === 'admin' ? '/admin' :
-                  currentUser.role === 'team' ? '/team' :
-                  '/user'
+                    currentUser.role === 'team' ? '/team' :
+                      '/user'
                 } replace />
               ) : (
                 <Navigate to="/login" replace />
               )
-            } 
+            }
           />
         </Routes>
       </Router>

@@ -5,10 +5,10 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
-import { getStoredData, setStoredData } from '../utils/mockData';
+import { User } from '../utils/mockData';
 
 interface RegisterProps {
-  onRegister: (user: any) => void;
+  onRegister: (user: User) => void;
 }
 
 export default function Register({ onRegister }: RegisterProps) {
@@ -19,8 +19,9 @@ export default function Register({ onRegister }: RegisterProps) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -34,29 +35,30 @@ export default function Register({ onRegister }: RegisterProps) {
       return;
     }
 
-    const users = getStoredData('users', []);
-    const existingUser = users.find((u: any) => u.email === email);
+    setIsLoading(true);
 
-    if (existingUser) {
-      setError('Email already registered');
-      return;
+    try {
+      // TODO: Replace with actual API call to backend
+      // const response = await fetch('/api/auth/register', {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({ name, email, phone, password, role: 'user' })
+      // });
+      // const data = await response.json();
+      // if (response.ok) {
+      //   onRegister(data.user);
+      // } else {
+      //   setError(data.message || 'Registration failed');
+      // }
+
+      // Temporary: suppress unused variable warnings
+      console.log('Registration will use:', { name, email, phone, onRegister });
+      setError('Backend API not connected yet');
+    } catch (err) {
+      setError('An error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
-
-    const newUser = {
-      id: Date.now().toString(),
-      email,
-      name,
-      phone,
-      password,
-      role: 'user',
-      image: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`
-    };
-
-    users.push(newUser);
-    setStoredData('users', users);
-
-    const { password: _, ...userWithoutPassword } = newUser;
-    onRegister(userWithoutPassword);
   };
 
   return (
@@ -144,8 +146,8 @@ export default function Register({ onRegister }: RegisterProps) {
             </div>
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
-            <Button type="submit" className="w-full">
-              Create Account
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? 'Creating Account...' : 'Create Account'}
             </Button>
             <p className="text-sm text-center text-gray-600">
               Already have an account?{' '}
