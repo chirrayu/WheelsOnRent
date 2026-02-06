@@ -1,11 +1,12 @@
-import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Car, DollarSign, HelpCircle } from 'lucide-react';
+import { NavLink } from 'react-router';
+import { LayoutDashboard, Car, DollarSign, HelpCircle, ClipboardCheck } from 'lucide-react';
 
 export default function AdminSidebar() {
   const navItems = [
     { path: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/admin/vehicles', icon: Car, label: 'Vehicle Management' },
     { path: '/admin/pricing', icon: DollarSign, label: 'Price Update' },
+    { path: '/admin/bookings', icon: ClipboardCheck, label: 'Bookings & DL Verification' },
     { path: '/admin/help', icon: HelpCircle, label: 'Help' },
   ];
 

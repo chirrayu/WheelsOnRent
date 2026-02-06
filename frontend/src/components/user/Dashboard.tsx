@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -7,51 +8,18 @@ import { Label } from '../ui/label';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { MapPin, Bike, Clock, DollarSign, Calendar } from 'lucide-react';
-import { locationsAPI, vehiclesAPI, pricingAPI, bookingsAPI } from '../../utils/api';
-import { User } from '../../utils/mockData';
-import { toast } from 'sonner';
+import { getStoredData, setStoredData } from '../../utils/mockData';
+import { toast } from 'sonner@2.0.3';
 
-// ... (interfaces remain same) should be replaced with actual interfaces
-
-interface Location {
-  id: string;
-  name: string;
-  address: string;
-  image: string;
-  isActive: boolean;
-}
-
-interface Pricing {
-  locationId: string;
-  vehicleType: 'bike' | 'scooter';
-  pricePerHour: number;
-  pricePerDay: number;
-}
-
-interface Vehicle {
-  id: string;
-  locationId: string;
-  type: 'bike' | 'scooter';
-  model: string;
-  status: 'available' | 'in-use' | 'maintenance';
-  currentUser?: string;
-  bookedUntil?: string;
-}
-
-interface BookingDetails {
-  vehicleType: 'bike' | 'scooter';
-  duration: 'hour' | 'day';
-  hours: string;
-}
-
-export default function Dashboard({ user }: { user: User }) {
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
+export default function Dashboard({ user }: any) {
+  const navigate = useNavigate();
+  const [locations, setLocations] = useState([]);
+  const [selectedLocation, setSelectedLocation] = useState(null);
   const [showPricingDialog, setShowPricingDialog] = useState(false);
   const [showBookingDialog, setShowBookingDialog] = useState(false);
-  const [pricing, setPricing] = useState<Pricing[]>([]);
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [bookingDetails, setBookingDetails] = useState<BookingDetails>({
+  const [pricing, setPricing] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
+  const [bookingDetails, setBookingDetails] = useState({
     vehicleType: 'bike',
     duration: 'hour',
     hours: '1'
@@ -61,43 +29,30 @@ export default function Dashboard({ user }: { user: User }) {
     loadData();
   }, []);
 
-  const loadData = async () => {
-    try {
-      const locResponse = await locationsAPI.getAll();
-      if (locResponse.success && locResponse.data) {
-        setLocations(locResponse.data.filter((l: any) => l.isActive));
-      }
-
-      const pricingResponse = await pricingAPI.getAll();
-      if (pricingResponse.success && pricingResponse.data) {
-        setPricing(pricingResponse.data);
-      }
-
-      const vehicleResponse = await vehiclesAPI.getAll();
-      if (vehicleResponse.success && vehicleResponse.data) {
-        setVehicles(vehicleResponse.data);
-      }
-    } catch (error) {
-      console.error('Failed to load data', error);
-      toast.error('Failed to load dashboard data');
-    }
+  const loadData = () => {
+    const locationsData = getStoredData('locations', []);
+    const pricingData = getStoredData('pricing', []);
+    const vehiclesData = getStoredData('vehicles', []);
+    setLocations(locationsData.filter((l: any) => l.isActive));
+    setPricing(pricingData);
+    setVehicles(vehiclesData);
   };
 
-  const handleLocationSelect = (location: Location) => {
+  const handleLocationSelect = (location: any) => {
     setSelectedLocation(location);
     setShowPricingDialog(true);
   };
 
   const getPricingForLocation = (locationId: string) => {
-    const bikePricing = pricing.find((p) => p.locationId === locationId && p.vehicleType === 'bike');
-    const scooterPricing = pricing.find((p) => p.locationId === locationId && p.vehicleType === 'scooter');
+    const bikePricing = pricing.find((p: any) => p.locationId === locationId && p.vehicleType === 'bike');
+    const scooterPricing = pricing.find((p: any) => p.locationId === locationId && p.vehicleType === 'scooter');
     return { bike: bikePricing, scooter: scooterPricing };
   };
 
   const getAvailableVehicles = (locationId: string, vehicleType: string) => {
-    return vehicles.filter((v) =>
-      v.locationId === locationId &&
-      v.type === vehicleType &&
+    return vehicles.filter((v: any) => 
+      v.locationId === locationId && 
+      v.type === vehicleType && 
       v.status === 'available'
     ).length;
   };
@@ -111,7 +66,7 @@ export default function Dashboard({ user }: { user: User }) {
     if (!selectedLocation) return 0;
     const locationPricing = getPricingForLocation(selectedLocation.id);
     const vehiclePricing = bookingDetails.vehicleType === 'bike' ? locationPricing.bike : locationPricing.scooter;
-
+    
     if (!vehiclePricing) return 0;
 
     if (bookingDetails.duration === 'hour') {
@@ -121,12 +76,12 @@ export default function Dashboard({ user }: { user: User }) {
     }
   };
 
-  const handleConfirmBooking = async () => {
+  const handleConfirmBooking = () => {
     if (!selectedLocation) return;
 
-    const availableVehicle = vehicles.find((v) =>
-      v.locationId === selectedLocation.id &&
-      v.type === bookingDetails.vehicleType &&
+    const availableVehicle = vehicles.find((v: any) => 
+      v.locationId === selectedLocation.id && 
+      v.type === bookingDetails.vehicleType && 
       v.status === 'available'
     );
 
@@ -143,34 +98,25 @@ export default function Dashboard({ user }: { user: User }) {
       endTime.setDate(endTime.getDate() + 1);
     }
 
-    try {
-      const bookingData = {
-        userId: user.id,
-        vehicleId: availableVehicle.id,
-        locationId: selectedLocation.id,
-        vehicleType: bookingDetails.vehicleType,
-        vehicleModel: availableVehicle.model,
-        startTime: now.toISOString(), // Use ISO string for API consistency
-        endTime: endTime.toISOString(),
-        duration: bookingDetails.duration === 'hour' ? `${bookingDetails.hours} hours` : '1 day',
-        totalCost: calculateCost(),
-        status: 'active',
-        bookingDate: now.toISOString().split('T')[0]
-      };
+    const bookingData = {
+      id: `B${Date.now()}`,
+      userId: user.id,
+      vehicleId: availableVehicle.id,
+      locationId: selectedLocation.id,
+      locationName: selectedLocation.name,
+      vehicleType: bookingDetails.vehicleType,
+      vehicleModel: availableVehicle.model,
+      startTime: now.toLocaleString(),
+      endTime: endTime.toLocaleString(),
+      duration: bookingDetails.duration === 'hour' ? `${bookingDetails.hours} hours` : '1 day',
+      totalCost: calculateCost(),
+      status: 'active',
+      bookingDate: now.toISOString().split('T')[0]
+    };
 
-      await bookingsAPI.create(bookingData);
-
-      // Optimistic update or reload
-      loadData();
-
-      toast.success('Booking confirmed! Enjoy your ride!');
-      setShowBookingDialog(false);
-      setSelectedLocation(null);
-      setBookingDetails({ vehicleType: 'bike', duration: 'hour', hours: '1' });
-
-    } catch (error) {
-      toast.error('Failed to confirm booking');
-    }
+    // Navigate to payment page with booking data
+    setShowBookingDialog(false);
+    navigate('/user/payment', { state: { bookingData } });
   };
 
   return (
@@ -181,15 +127,15 @@ export default function Dashboard({ user }: { user: User }) {
       </div>
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {locations.map((location) => {
-          // REMOVED unused locationPricing variable
+        {locations.map((location: any) => {
+          const locationPricing = getPricingForLocation(location.id);
           const bikesAvailable = getAvailableVehicles(location.id, 'bike');
           const scootersAvailable = getAvailableVehicles(location.id, 'scooter');
 
           return (
             <Card key={location.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-              <img
-                src={location.image}
+              <img 
+                src={location.image} 
                 alt={location.name}
                 className="w-full h-48 object-cover"
               />
@@ -217,8 +163,8 @@ export default function Dashboard({ user }: { user: User }) {
                     </Badge>
                   </div>
                 </div>
-                <Button
-                  className="w-full"
+                <Button 
+                  className="w-full" 
                   onClick={() => handleLocationSelect(location)}
                   disabled={bikesAvailable === 0 && scootersAvailable === 0}
                 >
@@ -240,7 +186,7 @@ export default function Dashboard({ user }: { user: User }) {
             </DialogTitle>
             <DialogDescription>{selectedLocation?.address}</DialogDescription>
           </DialogHeader>
-
+          
           {selectedLocation && (
             <div className="space-y-6">
               <div className="grid md:grid-cols-2 gap-6">
@@ -316,7 +262,7 @@ export default function Dashboard({ user }: { user: User }) {
               </div>
             </div>
           )}
-
+          
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowPricingDialog(false)}>
               Close
@@ -337,22 +283,22 @@ export default function Dashboard({ user }: { user: User }) {
               Complete your booking at {selectedLocation?.name}
             </DialogDescription>
           </DialogHeader>
-
+          
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Vehicle Type</Label>
-              <RadioGroup value={bookingDetails.vehicleType} onValueChange={(value) => setBookingDetails({ ...bookingDetails, vehicleType: value as 'bike' | 'scooter' })}>
+              <RadioGroup value={bookingDetails.vehicleType} onValueChange={(value) => setBookingDetails({ ...bookingDetails, vehicleType: value })}>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="bike" id="bike" />
                   <Label htmlFor="bike" className="cursor-pointer">
-                    Bike - ${getPricingForLocation(selectedLocation?.id || '').bike?.pricePerHour}/hr,
+                    Bike - ${getPricingForLocation(selectedLocation?.id || '').bike?.pricePerHour}/hr, 
                     ${getPricingForLocation(selectedLocation?.id || '').bike?.pricePerDay}/day
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="scooter" id="scooter" />
                   <Label htmlFor="scooter" className="cursor-pointer">
-                    Scooter - ${getPricingForLocation(selectedLocation?.id || '').scooter?.pricePerHour}/hr,
+                    Scooter - ${getPricingForLocation(selectedLocation?.id || '').scooter?.pricePerHour}/hr, 
                     ${getPricingForLocation(selectedLocation?.id || '').scooter?.pricePerDay}/day
                   </Label>
                 </div>
@@ -361,7 +307,7 @@ export default function Dashboard({ user }: { user: User }) {
 
             <div className="space-y-2">
               <Label>Duration</Label>
-              <Select value={bookingDetails.duration} onValueChange={(value) => setBookingDetails({ ...bookingDetails, duration: value as 'hour' | 'day' })}>
+              <Select value={bookingDetails.duration} onValueChange={(value) => setBookingDetails({ ...bookingDetails, duration: value })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -400,7 +346,7 @@ export default function Dashboard({ user }: { user: User }) {
               </div>
             </div>
           </div>
-
+          
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowBookingDialog(false)}>
               Cancel

@@ -1,14 +1,15 @@
 import { Bike, LogOut } from 'lucide-react';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { User } from '../utils/mockData';
 
 interface GlobalNavbarProps {
-  user: User;
+  user: any;
   onLogout: () => void;
+  sidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
 }
 
-export default function GlobalNavbar({ user, onLogout }: GlobalNavbarProps) {
+export default function GlobalNavbar({ user, onLogout, sidebarOpen, onToggleSidebar }: GlobalNavbarProps) {
   return (
     <div className="bg-white border-b border-gray-200 px-6 py-4">
       <div className="flex items-center justify-between">
@@ -18,7 +19,7 @@ export default function GlobalNavbar({ user, onLogout }: GlobalNavbarProps) {
           </div>
           <span className="text-xl font-semibold text-gray-900">WheelOnRoad</span>
         </div>
-
+        
         <div className="flex items-center gap-4">
           <div className="text-right hidden sm:block">
             <p className="text-sm font-medium text-gray-900">{user.name}</p>

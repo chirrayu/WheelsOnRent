@@ -1,14 +1,14 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { Bike, Eye, EyeOff } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
-import { User } from '../utils/mockData';
+import { mockUsers } from '../utils/mockData';
 
 interface LoginProps {
-  onLogin: (user: User) => void;
+  onLogin: (user: any) => void;
 }
 
 export default function Login({ onLogin }: LoginProps) {
@@ -16,34 +16,20 @@ export default function Login({ onLogin }: LoginProps) {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setIsLoading(true);
 
-    try {
-      // TODO: Replace with actual API call to backend
-      // const response = await fetch('/api/auth/login', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ email, password })
-      // });
-      // const data = await response.json();
-      // if (response.ok) {
-      //   onLogin(data.user);
-      // } else {
-      //   setError(data.message || 'Invalid email or password');
-      // }
+    const user = mockUsers.find(
+      (u) => u.email === email && u.password === password
+    );
 
-      // Temporary: suppress unused variable warnings
-      console.log('Login will use:', { email, onLogin });
-      setError('Backend API not connected yet');
-    } catch (err) {
-      setError('An error occurred. Please try again.');
-    } finally {
-      setIsLoading(false);
+    if (user) {
+      const { password, ...userWithoutPassword } = user;
+      onLogin(userWithoutPassword);
+    } else {
+      setError('Invalid email or password');
     }
   };
 
@@ -97,10 +83,16 @@ export default function Login({ onLogin }: LoginProps) {
                 </button>
               </div>
             </div>
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+              <p className="font-medium mb-2">Demo Credentials:</p>
+              <p className="text-xs text-gray-600 mb-1">Admin: admin@wheelonroad.com / admin123</p>
+              <p className="text-xs text-gray-600 mb-1">User: user@example.com / user123</p>
+              <p className="text-xs text-gray-600">Team: team@wheelonroad.com / team123</p>
+            </div>
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Signing In...' : 'Sign In'}
+            <Button type="submit" className="w-full">
+              Sign In
             </Button>
             <p className="text-sm text-center text-gray-600">
               Don't have an account?{' '}

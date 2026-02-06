@@ -6,43 +6,15 @@ import { Label } from '../ui/label';
 import { Badge } from '../ui/badge';
 import { Switch } from '../ui/switch';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
-import { Plus, Edit, MapPin } from 'lucide-react';
-import { locationsAPI, vehiclesAPI } from '../../utils/api';
-import { toast } from 'sonner';
-
-interface Location {
-  id: string;
-  name: string;
-  address: string;
-  lat: number;
-  lng: number;
-  image: string;
-  isActive: boolean;
-}
-
-interface Vehicle {
-  id: string;
-  locationId: string;
-  status: string;
-}
-
-interface LocationFormProps {
-  formData: {
-    name: string;
-    address: string;
-    lat: string | number;
-    lng: string | number;
-    image: string;
-    isActive: boolean;
-  };
-  setFormData: (data: any) => void;
-}
+import { Plus, Edit, MapPin, Bike } from 'lucide-react';
+import { getStoredData, setStoredData } from '../../utils/mockData';
+import { toast } from 'sonner@2.0.3';
 
 export default function LocationManager() {
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [locations, setLocations] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [editingLocation, setEditingLocation] = useState<Location | null>(null);
+  const [editingLocation, setEditingLocation] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     address: '',
@@ -56,21 +28,11 @@ export default function LocationManager() {
     loadData();
   }, []);
 
-  const loadData = async () => {
-    try {
-      const locResponse = await locationsAPI.getAll();
-      if (locResponse.success && locResponse.data) {
-        setLocations(locResponse.data);
-      }
-
-      const vehicleResponse = await vehiclesAPI.getAll();
-      if (vehicleResponse.success && vehicleResponse.data) {
-        setVehicles(vehicleResponse.data);
-      }
-    } catch (error) {
-      console.error('Failed to load data', error);
-      toast.error('Failed to load data');
-    }
+  const loadData = () => {
+    const locationsData = getStoredData('locations', []);
+    const vehiclesData = getStoredData('vehicles', []);
+    setLocations(locationsData);
+    setVehicles(vehiclesData);
   };
 
   const getVehicleCount = (locationId: string) => {
@@ -81,54 +43,46 @@ export default function LocationManager() {
     return vehicles.filter((v: any) => v.locationId === locationId && v.status === 'available').length;
   };
 
-  const handleAddLocation = async () => {
-    try {
-      const data = {
-        ...formData,
-        lat: parseFloat(formData.lat) || 0,
-        lng: parseFloat(formData.lng) || 0
-      };
+  const handleAddLocation = () => {
+    const newLocation = {
+      id: Date.now().toString(),
+      ...formData,
+      lat: parseFloat(formData.lat) || 0,
+      lng: parseFloat(formData.lng) || 0
+    };
 
-      await locationsAPI.create(data);
-      loadData(); // Reload data
-      setIsAddDialogOpen(false);
-      resetForm();
-      toast.success('Location added successfully!');
-    } catch (error) {
-      toast.error('Failed to add location');
-    }
+    const updatedLocations = [...locations, newLocation];
+    setLocations(updatedLocations);
+    setStoredData('locations', updatedLocations);
+    setIsAddDialogOpen(false);
+    resetForm();
+    toast.success('Location added successfully!');
   };
 
-  const handleUpdateLocation = async () => {
-    if (!editingLocation) return;
-    try {
-      const data = {
-        ...formData,
-        lat: parseFloat(formData.lat) || 0,
-        lng: parseFloat(formData.lng) || 0
-      };
-
-      await locationsAPI.update(editingLocation.id, data);
-      loadData(); // Reload data
-      setEditingLocation(null);
-      resetForm();
-      toast.success('Location updated successfully!');
-    } catch (error) {
-      toast.error('Failed to update location');
-    }
+  const handleUpdateLocation = () => {
+    const updatedLocations = locations.map((l: any) =>
+      l.id === editingLocation.id
+        ? {
+            ...l,
+            ...formData,
+            lat: parseFloat(formData.lat) || l.lat,
+            lng: parseFloat(formData.lng) || l.lng
+          }
+        : l
+    );
+    setLocations(updatedLocations);
+    setStoredData('locations', updatedLocations);
+    setEditingLocation(null);
+    resetForm();
+    toast.success('Location updated successfully!');
   };
 
-  const toggleLocationStatus = async (locationId: string) => {
-    // Optimistic update
-    const location = locations.find(l => l.id === locationId);
-    if (!location) return;
-
-    try {
-      await locationsAPI.update(locationId, { isActive: !location.isActive });
-      loadData();
-    } catch (error) {
-      toast.error('Failed to update status');
-    }
+  const toggleLocationStatus = (locationId: string) => {
+    const updatedLocations = locations.map((l: any) =>
+      l.id === locationId ? { ...l, isActive: !l.isActive } : l
+    );
+    setLocations(updatedLocations);
+    setStoredData('locations', updatedLocations);
   };
 
   const resetForm = () => {
@@ -208,8 +162,8 @@ export default function LocationManager() {
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         {locations.map((location: any) => (
           <Card key={location.id} className="overflow-hidden">
-            <img
-              src={location.image}
+            <img 
+              src={location.image} 
               alt={location.name}
               className="w-full h-48 object-cover"
             />
@@ -264,7 +218,7 @@ export default function LocationManager() {
   );
 }
 
-function LocationForm({ formData, setFormData }: LocationFormProps) {
+function LocationForm({ formData, setFormData }: any) {
   return (
     <div className="space-y-4">
       <div className="space-y-2">

@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink } from 'react-router';
 import { MapPin } from 'lucide-react';
 
 export default function TeamSidebar() {

@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router';
 import { useEffect } from 'react';
 import GlobalNavbar from '../components/GlobalNavbar';
 import TeamSidebar from '../components/team/TeamSidebar';

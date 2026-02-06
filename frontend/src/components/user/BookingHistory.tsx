@@ -2,66 +2,27 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { MapPin, Bike, Calendar, DollarSign, Clock } from 'lucide-react';
-import { bookingsAPI, locationsAPI } from '../../utils/api';
-import { User } from '../../utils/mockData';
-import { toast } from 'sonner';
+import { getStoredData } from '../../utils/mockData';
 
-interface Booking {
-  id: string;
-  userId: string;
-  locationId: string;
-  status: string;
-  vehicleType: string;
-  vehicleModel: string;
-  bookingDate: string;
-  duration: string;
-  totalCost: number;
-  startTime: string;
-  endTime: string;
-}
-
-interface Location {
-  id: string;
-  name: string;
-  address: string;
-}
-
-interface BookingHistoryProps {
-  user: User;
-}
-
-export default function BookingHistory({ user }: BookingHistoryProps) {
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
+export default function BookingHistory({ user }: any) {
+  const [bookings, setBookings] = useState([]);
+  const [locations, setLocations] = useState([]);
 
   useEffect(() => {
-    loadData();
+    const bookingsData = getStoredData('bookings', []);
+    const locationsData = getStoredData('locations', []);
+    const userBookings = bookingsData.filter((b: any) => b.userId === user.id);
+    setBookings(userBookings.sort((a: any, b: any) => new Date(b.bookingDate).getTime() - new Date(a.bookingDate).getTime()));
+    setLocations(locationsData);
   }, [user.id]);
 
-  const loadData = async () => {
-    try {
-      const bookingsResponse = await bookingsAPI.getUserBookings(user.id);
-      if (bookingsResponse.success && bookingsResponse.data) {
-        setBookings(bookingsResponse.data.sort((a: any, b: any) => new Date(b.bookingDate).getTime() - new Date(a.bookingDate).getTime()));
-      }
-
-      const locationsResponse = await locationsAPI.getAll();
-      if (locationsResponse.success && locationsResponse.data) {
-        setLocations(locationsResponse.data);
-      }
-    } catch (error) {
-      console.error('Failed to load history', error);
-      toast.error('Failed to load booking history');
-    }
-  };
-
   const getLocationName = (locationId: string) => {
-    const location = locations.find((l) => l.id === locationId);
+    const location = locations.find((l: any) => l.id === locationId);
     return location ? location.name : 'Unknown Location';
   };
 
   const getLocationAddress = (locationId: string) => {
-    const location = locations.find((l) => l.id === locationId);
+    const location = locations.find((l: any) => l.id === locationId);
     return location ? location.address : '';
   };
 
@@ -97,7 +58,7 @@ export default function BookingHistory({ user }: BookingHistoryProps) {
         </Card>
       ) : (
         <div className="grid gap-6">
-          {bookings.map((booking) => (
+          {bookings.map((booking: any) => (
             <Card key={booking.id} className="overflow-hidden">
               <CardHeader className="bg-gradient-to-r from-indigo-50 to-blue-50">
                 <div className="flex items-start justify-between">
@@ -129,7 +90,7 @@ export default function BookingHistory({ user }: BookingHistoryProps) {
                         </p>
                       </div>
                     </div>
-
+                    
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
                         <Calendar className="w-5 h-5 text-green-600" />
@@ -151,7 +112,7 @@ export default function BookingHistory({ user }: BookingHistoryProps) {
                         <p className="font-medium">{booking.duration}</p>
                       </div>
                     </div>
-
+                    
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
                         <DollarSign className="w-5 h-5 text-orange-600" />

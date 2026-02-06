@@ -1,31 +1,33 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router';
 import { Toaster } from './components/ui/sonner';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import AdminPanel from './pages/AdminPanel';
 import UserPortal from './pages/UserPortal';
 import MyTeamPanel from './pages/MyTeamPanel';
-import { User } from './utils/mockData';
 
 export default function App() {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // TODO: Check authentication status with backend API
-    // For now, just set loading to false
+    // Check if user is logged in
+    const storedUser = localStorage.getItem('currentUser');
+    if (storedUser) {
+      setCurrentUser(JSON.parse(storedUser));
+    }
     setIsLoading(false);
   }, []);
 
-  const handleLogin = (user: User) => {
+  const handleLogin = (user) => {
     setCurrentUser(user);
-    // TODO: Store authentication token from backend
+    localStorage.setItem('currentUser', JSON.stringify(user));
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
-    // TODO: Clear authentication token and call logout API
+    localStorage.removeItem('currentUser');
   };
 
   if (isLoading) {
@@ -40,77 +42,77 @@ export default function App() {
     <>
       <Router>
         <Routes>
-          <Route
-            path="/login"
+          <Route 
+            path="/login" 
             element={
               currentUser ? (
                 <Navigate to={
                   currentUser.role === 'admin' ? '/admin' :
-                    currentUser.role === 'team' ? '/team' :
-                      '/user'
+                  currentUser.role === 'team' ? '/team' :
+                  '/user'
                 } replace />
               ) : (
                 <Login onLogin={handleLogin} />
               )
-            }
+            } 
           />
-          <Route
-            path="/register"
+          <Route 
+            path="/register" 
             element={
               currentUser ? (
                 <Navigate to={
                   currentUser.role === 'admin' ? '/admin' :
-                    currentUser.role === 'team' ? '/team' :
-                      '/user'
+                  currentUser.role === 'team' ? '/team' :
+                  '/user'
                 } replace />
               ) : (
                 <Register onRegister={handleLogin} />
               )
-            }
+            } 
           />
-          <Route
-            path="/admin/*"
+          <Route 
+            path="/admin/*" 
             element={
               currentUser?.role === 'admin' ? (
                 <AdminPanel user={currentUser} onLogout={handleLogout} />
               ) : (
                 <Navigate to="/login" replace />
               )
-            }
+            } 
           />
-          <Route
-            path="/user/*"
+          <Route 
+            path="/user/*" 
             element={
               currentUser?.role === 'user' ? (
                 <UserPortal user={currentUser} onLogout={handleLogout} />
               ) : (
                 <Navigate to="/login" replace />
               )
-            }
+            } 
           />
-          <Route
-            path="/team/*"
+          <Route 
+            path="/team/*" 
             element={
               currentUser?.role === 'team' ? (
                 <MyTeamPanel user={currentUser} onLogout={handleLogout} />
               ) : (
                 <Navigate to="/login" replace />
               )
-            }
+            } 
           />
-          <Route
-            path="/"
+          <Route 
+            path="/" 
             element={
               currentUser ? (
                 <Navigate to={
                   currentUser.role === 'admin' ? '/admin' :
-                    currentUser.role === 'team' ? '/team' :
-                      '/user'
+                  currentUser.role === 'team' ? '/team' :
+                  '/user'
                 } replace />
               ) : (
                 <Navigate to="/login" replace />
               )
-            }
+            } 
           />
         </Routes>
       </Router>

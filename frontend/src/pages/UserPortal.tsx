@@ -1,10 +1,11 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router';
 import { useEffect } from 'react';
 import GlobalNavbar from '../components/GlobalNavbar';
 import UserSidebar from '../components/user/UserSidebar';
 import Dashboard from '../components/user/Dashboard';
 import BookingHistory from '../components/user/BookingHistory';
 import Help from '../components/user/Help';
+import Payment from './Payment';
 import { initializeMockData } from '../utils/mockData';
 
 interface UserPortalProps {
@@ -28,6 +29,7 @@ export default function UserPortal({ user, onLogout }: UserPortalProps) {
             <Route path="/dashboard" element={<Dashboard user={user} />} />
             <Route path="/bookings" element={<BookingHistory user={user} />} />
             <Route path="/help" element={<Help />} />
+            <Route path="/payment" element={<Payment user={user} />} />
           </Routes>
         </main>
       </div>

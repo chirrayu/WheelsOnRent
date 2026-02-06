@@ -2,27 +2,11 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Bike, Users, MapPin, Activity } from 'lucide-react';
-import { vehiclesAPI, locationsAPI } from '../../utils/api';
-import { toast } from 'sonner';
-
-interface Location {
-  id: string;
-  name: string;
-}
-
-interface Vehicle {
-  id: string;
-  type: string;
-  status: string;
-  model: string;
-  locationId: string;
-  currentUser?: string;
-  bookedUntil?: string;
-}
+import { getStoredData } from '../../utils/mockData';
 
 export default function Dashboard() {
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
+  const [vehicles, setVehicles] = useState([]);
+  const [locations, setLocations] = useState([]);
   const [stats, setStats] = useState({
     totalVehicles: 0,
     inUse: 0,
@@ -31,35 +15,19 @@ export default function Dashboard() {
   });
 
   useEffect(() => {
-    loadData();
+    const vehiclesData = getStoredData('vehicles', []);
+    const locationsData = getStoredData('locations', []);
+    
+    setVehicles(vehiclesData);
+    setLocations(locationsData);
+
+    setStats({
+      totalVehicles: vehiclesData.length,
+      inUse: vehiclesData.filter((v: any) => v.status === 'in-use').length,
+      available: vehiclesData.filter((v: any) => v.status === 'available').length,
+      maintenance: vehiclesData.filter((v: any) => v.status === 'maintenance').length,
+    });
   }, []);
-
-  const loadData = async () => {
-    try {
-      const vehiclesResponse = await vehiclesAPI.getAll();
-      const locationsResponse = await locationsAPI.getAll();
-
-      let vehiclesData: Vehicle[] = [];
-      if (vehiclesResponse.success && vehiclesResponse.data) {
-        vehiclesData = vehiclesResponse.data;
-        setVehicles(vehiclesData);
-      }
-
-      if (locationsResponse.success && locationsResponse.data) {
-        setLocations(locationsResponse.data);
-      }
-
-      setStats({
-        totalVehicles: vehiclesData.length,
-        inUse: vehiclesData.filter((v) => v.status === 'in-use').length,
-        available: vehiclesData.filter((v) => v.status === 'available').length,
-        maintenance: vehiclesData.filter((v) => v.status === 'maintenance').length,
-      });
-    } catch (error) {
-      console.error('Failed to load dashboard data', error);
-      toast.error('Failed to load dashboard stats');
-    }
-  };
 
   const getLocationName = (locationId: string) => {
     const location = locations.find((l: any) => l.id === locationId);
