@@ -1,0 +1,43 @@
+.booking-history {
+  padding: 20px;
+  margin-top: 60px;
+}
+
+.history-filters {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.history-filters select,
+.history-filters input {
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.history-table {
+  overflow-x: auto;
+}
+
+.status-badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.status-completed {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-active {
+  background-color: #cce5ff;
+  color: #004085;
+}
+
+.status-cancelled {
+  background-color: #f8d7da;
+  color: #721c24;
+}
