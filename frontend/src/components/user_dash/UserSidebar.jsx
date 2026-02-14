@@ -30,12 +30,6 @@ const UserSidebar = ({ isOpen, onClose }) => {
           </Link>
         </li>
         <li>
-          <Link 
-            to="/user-portal/verify" 
-            className={isActive('/verify') ? 'active' : ''}
-          >
-            Verify Customer
-          </Link>
         </li>
         <li>
           <Link 

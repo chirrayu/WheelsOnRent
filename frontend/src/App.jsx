@@ -1,11 +1,13 @@
 import React, { useState, createContext, useContext } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
-import Register from './pages/Register';
+import Registration from './pages/Registration';
 import AdminPanel from './pages/AdminPanel';
 import UserPortal from './pages/UserPortal';
 import DLUpload from './pages/DL_upload';
-import MyTeamPanel from './pages/My_Team_Panel';
+import MyTeamPanel from './pages/MyTeamPanel';
+import PasswordReset from './pages/PasswordReset';
+import AddVendor from './pages/AddVendor';
 
 // Create Auth Context
 const AuthContext = createContext();
@@ -55,7 +57,8 @@ function App() {
       <Routes>
         <Route path="/" element={<Login />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+        <Route path="/register" element={<Registration />} />
+        <Route path="/reset-password" element={<PasswordReset />} />
         <Route path="/dl-upload" element={
           <ProtectedRoute>
             <DLUpload />
@@ -74,6 +77,11 @@ function App() {
         <Route path="/team-panel/*" element={
           <ProtectedRoute allowedRoles={['team', 'admin']}>
             <MyTeamPanel />
+          </ProtectedRoute>
+        } />
+        <Route path="/team/add-vendor" element={
+          <ProtectedRoute allowedRoles={['team', 'admin']}>
+            <AddVendor />
           </ProtectedRoute>
         } />
       </Routes>

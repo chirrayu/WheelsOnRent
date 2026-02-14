@@ -8,6 +8,7 @@ import LocationManagement from '../components/admin/location_management';
 import PriceUpdate from '../components/admin/price_update';
 import Help from '../components/admin/Help';
 import './AdminPanel.css';
+import CustomerVerify from '../components/user_dash/Customer_verify';
 
 const AdminPanel = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -30,6 +31,7 @@ const AdminPanel = () => {
         <Routes>
           <Route path="/" element={<Navigate to="/admin-panel/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/verify" element={<CustomerVerify />} />
           <Route path="/vehicles" element={<VehicleManagement />} />
           <Route path="/locations" element={<LocationManagement />} />
           <Route path="/pricing" element={<PriceUpdate />} />

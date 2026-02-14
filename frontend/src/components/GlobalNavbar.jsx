@@ -14,7 +14,7 @@ const GlobalNavbar = ({ userRole, onLogout }) => {
         <button className="sidebar-toggle" onClick={toggleSidebar}>
           â˜°
         </button>
-        <h2>Vehicle Booking System</h2>
+        <h2>WheelsOnRent</h2>
       </div>
       
       <div className="navbar-user">

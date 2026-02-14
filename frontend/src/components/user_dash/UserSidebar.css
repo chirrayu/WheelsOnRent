@@ -17,7 +17,7 @@
 
 .user-header {
   padding: 20px;
-  border-bottom: 1px solid #6c757d;
+  border-bottom: 1px solid #000000;
 }
 
 .user-sidebar
@@ -32,7 +32,7 @@
 }
 
 .user-sidebar-menu li {
-  border-bottom: 1px solid #6c757d;
+  border-bottom: 1px solid #000000;
 }
 
 .user-sidebar-menu a {
@@ -45,5 +45,5 @@
 
 .user-sidebar-menu a:hover,
 .user-sidebar-menu a.active {
-  background-color: #6c757d;
+  background-color: #000000;
 }

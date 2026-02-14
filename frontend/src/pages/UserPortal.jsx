@@ -4,7 +4,6 @@ import GlobalNavbar from '../components/GlobalNavbar';
 import UserSidebar from '../components/user_dash/UserSidebar';
 import UserDashboard from '../components/user_dash/Dashboard';
 import BookingHistory from '../components/user_dash/Booking_History';
-import CustomerVerify from '../components/user_dash/Customer_verify';
 import UserHelp from '../components/user_dash/Help';
 import './UserPortal.css';
 
@@ -30,7 +29,6 @@ const UserPortal = () => {
           <Route path="/" element={<Navigate to="/user-portal/dashboard" replace />} />
           <Route path="/dashboard" element={<UserDashboard />} />
           <Route path="/history" element={<BookingHistory />} />
-          <Route path="/verify" element={<CustomerVerify />} />
           <Route path="/help" element={<UserHelp />} />
         </Routes>
       </div>
