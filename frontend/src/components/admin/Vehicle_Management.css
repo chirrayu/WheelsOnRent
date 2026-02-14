@@ -1,0 +1,23 @@
+.vehicle-management {
+  padding: 20px;
+  margin-top: 60px;
+}
+
+.vehicle-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.add-vehicle-form {
+  margin-bottom: 20px;
+}
+
+.vehicle-table {
+  overflow-x: auto;
+}
+
+.vehicle-actions button {
+  margin-left: 10px;
+}

@@ -1,0 +1,47 @@
+.help-page {
+  padding: 20px;
+  margin-top: 60px;
+}
+
+.contact-form {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.contact-form .form-group {
+  margin-bottom: 20px;
+}
+
+.contact-form textarea {
+  height: 120px;
+  resize: vertical;
+}
+
+.faq-section {
+  margin-top: 40px;
+}
+
+.faq-item {
+  margin-bottom: 15px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+}
+
+.faq-question {
+  padding: 15px;
+  background-color: #f8f9fa;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.faq-answer {
+  padding: 15px;
+  display: none;
+}
+
+.faq-item.active .faq-answer {
+  display: block;
+}
