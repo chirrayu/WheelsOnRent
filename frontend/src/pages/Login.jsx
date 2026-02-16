@@ -70,6 +70,8 @@ const Login = () => {
           navigate('/admin-panel/dashboard');
         } else if (user.role === 'team') {
           navigate('/team-panel/location-manager');
+        } else if (user.role === 'vendor') {
+          navigate('/vendor-panel'); // Updated to redirect to vendor panel root
         } else {
           navigate('/user-portal/dashboard');
         }
