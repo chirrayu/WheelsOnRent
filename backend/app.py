@@ -356,5 +356,5 @@ def verify_qr_route(vendor_id):
 def update_ride_status_route(vendor_id):
     return update_ride_status(vendor_id)
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+if __name__ == "__main__":
+    app.run(debug=True)
