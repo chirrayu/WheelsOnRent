@@ -1,0 +1,13 @@
+flask
+flask-cors
+pymongo
+PyJWT
+bcrypt
+easyocr
+numpy
+opencv-python-headless
+resend
+qrcode
+pillow
+werkzeug
+python-dotenv
