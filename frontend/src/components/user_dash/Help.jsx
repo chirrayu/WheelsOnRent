@@ -1,89 +1,91 @@
-import React, { useState } from 'react';
+import React from 'react';
 import './Help.css';
 
-const UserHelp = () => {
-  const [contactForm, setContactForm] = useState({
-    subject: '',
-    message: ''
-  });
-  
-  const [faqs, setFaqs] = useState([
-    { question: 'How do I book a vehicle?', answer: 'Select a location and choose the vehicle type you want to rent.' },
-    { question: 'What payment methods are accepted?', answer: 'We accept credit/debit cards and digital wallets.' },
-    { question: 'How do I return a vehicle?', answer: 'Return the vehicle to any authorized location before the due time.' },
-  ]);
-
-  const [activeFaqIndex, setActiveFaqIndex] = useState(null);
-
-  const handleInputChange = (e) => {
-    setContactForm({
-      ...contactForm,
-      [e.target.name]: e.target.value
-    });
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    alert('Message sent successfully! We will get back to you soon.');
-    setContactForm({ subject: '', message: '' });
-  };
-
-  const toggleFaq = (index) => {
-    setActiveFaqIndex(activeFaqIndex === index ? null : index);
-  };
+const Help = () => {
+  const faqs = [
+    {
+      question: "How do I book a vehicle?",
+      answer: "Browse available vendors and vehicles, select your preferred dates, and complete the booking process."
+    },
+    {
+      question: "How can I contact customer support?",
+      answer: "Use the chat feature or email us at support@wheelsonrent.com during business hours."
+    },
+    {
+      question: "What documents do I need?",
+      answer: "A valid driver's license and proof of insurance are required for vehicle rental."
+    }
+  ];
 
   return (
-    <div className="user-help-page">
-      <h2>Help & Support</h2>
-      
-      <div className="card user-contact-form">
-        <h3>Contact Us</h3>
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="subject">Subject:</label>
-            <input
-              type="text"
-              id="subject"
-              name="subject"
-              className="form-control"
-              value={contactForm.subject}
-              onChange={handleInputChange}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="message">Message:</label>
-            <textarea
-              id="message"
-              name="message"
-              className="form-control"
-              value={contactForm.message}
-              onChange={handleInputChange}
-              required
-            ></textarea>
-          </div>
-          <button type="submit" className="btn btn-primary">Send Message</button>
-        </form>
-      </div>
+    <div style={styles.container}>
+      <h2 style={styles.title}>Help & Support</h2>
 
-      <div className="user-faq-section">
-        <h3>Frequently Asked Questions</h3>
-        {faqs.map((faq, index) => (
-          <div 
-            key={index} 
-            className={`user-faq-item ${activeFaqIndex === index ? 'active' : ''}`}
-            onClick={() => toggleFaq(index)}
-          >
-            <div className="user-faq-question">
-              {faq.question}
-              <span>{activeFaqIndex === index ? '-' : '+'}</span>
-            </div>
-            <div className="user-faq-answer">{faq.answer}</div>
+      <div style={styles.content}>
+        <div style={styles.section}>
+          <h3 style={styles.sectionTitle}>Frequently Asked Questions</h3>
+          <div style={styles.faqList}>
+            {faqs.map((faq, index) => (
+              <div key={index} style={styles.faqItem}>
+                <h4 style={styles.question}>{faq.question}</h4>
+                <p style={styles.answer}>{faq.answer}</p>
+              </div>
+            ))}
           </div>
-        ))}
+        </div>
       </div>
     </div>
   );
 };
 
-export default UserHelp;
+const styles = {
+  container: {
+    padding: '24px',
+    backgroundColor: '#f8fafc',
+    minHeight: '100vh'
+  },
+  title: {
+    margin: '0 0 24px 0',
+    fontSize: '1.75rem',
+    fontWeight: '600',
+    color: '#1e293b'
+  },
+  content: {},
+  section: {
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    padding: '24px',
+    marginBottom: '24px',
+    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
+  },
+  sectionTitle: {
+    margin: '0 0 16px 0',
+    fontSize: '1.25rem',
+    fontWeight: '600',
+    color: '#1e293b'
+  },
+  faqList: {},
+  faqItem: {
+    marginBottom: '20px',
+    borderBottom: '1px solid #e2e8f0',
+    paddingBottom: '20px'
+  },
+  question: {
+    margin: '0 0 8px 0',
+    fontSize: '1rem',
+    fontWeight: '600',
+    color: '#1e293b'
+  },
+  answer: {
+    margin: '0',
+    color: '#64748b',
+    lineHeight: '1.6'
+  },
+  contactInfo: {},
+  contactItem: {
+    marginBottom: '8px',
+    color: '#64748b'
+  }
+};
+
+export default Help;

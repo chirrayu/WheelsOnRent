@@ -1,13 +1,14 @@
-import React, { useState, createContext, useContext } from 'react';
+import { useState, createContext, useContext } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Registration from './pages/Registration';
-import AdminPanel from './pages/AdminPanel';
+// Removed AdminPanel import
 import UserPortal from './pages/UserPortal';
 import DLUpload from './pages/DL_upload';
 import MyTeamPanel from './pages/MyTeamPanel';
 import PasswordReset from './pages/PasswordReset';
 import AddVendor from './pages/AddVendor';
+import VendorPanel from './pages/VendorPanel';
 
 // Create Auth Context
 const AuthContext = createContext();
@@ -51,6 +52,17 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   return children;
 };
 
+// Vendor Protected Route Component
+const VendorProtectedRoute = ({ children }) => {
+  const { user } = useAuth();
+  
+  if (!user || user.role !== 'vendor') {
+    return <Navigate to="/login" replace />;
+  }
+  
+  return children;
+};
+
 function App() {
   return (
     <AuthProvider>
@@ -64,11 +76,7 @@ function App() {
             <DLUpload />
           </ProtectedRoute>
         } />
-        <Route path="/admin-panel/*" element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminPanel />
-          </ProtectedRoute>
-        } />
+        {/* Removed AdminPanel route */}
         <Route path="/user-portal/*" element={
           <ProtectedRoute allowedRoles={['user', 'admin']}>
             <UserPortal />
@@ -83,6 +91,17 @@ function App() {
           <ProtectedRoute allowedRoles={['team', 'admin']}>
             <AddVendor />
           </ProtectedRoute>
+        } />
+        {/* Updated vendor panel routes to handle base route */}
+        <Route path="/vendor-panel" element={
+          <VendorProtectedRoute>
+            <VendorPanel />
+          </VendorProtectedRoute>
+        } />
+        <Route path="/vendor-panel/*" element={
+          <VendorProtectedRoute>
+            <VendorPanel />
+          </VendorProtectedRoute>
         } />
       </Routes>
     </AuthProvider>
