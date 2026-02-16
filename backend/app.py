@@ -10,7 +10,7 @@ from ride_history import get_user_bookings, create_booking, cancel_booking, get_
 from qr import get_booking_qr, verify_qr, update_ride_status
 import jwt
 from functools import wraps
-
+import database
 app = Flask(__name__)
 CORS(app)
 
@@ -21,6 +21,7 @@ app.config['SECRET_KEY'] = 'your-secret-key'  # Change this to a strong secret i
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
+        
         token = request.headers.get('Authorization')
         
         if not token:
@@ -196,35 +197,13 @@ def get_vendor_vehicles_public_route(current_user_id, vendor_id):
         from bson import ObjectId
         db = get_db()
         
-        # Find active vehicles for this vendor - handle both string and ObjectId types
-        print(f"DEBUG: Searching vehicles for vendor ID: {vendor_id}")
-        
-        search_query = {
-            '$and': [
-                {'is_available': True},
-                {'$or': [
-                    {'vendor_id': vendor_id},
-                    {'vendor_id': str(vendor_id)}
-                ]}
-            ]
-        }
-        
-        # Try to add ObjectId version of vendor_id to query if valid
-        try:
-            from bson import ObjectId
-            if ObjectId.is_valid(vendor_id):
-                search_query['$and'][1]['$or'].append({'vendor_id': ObjectId(vendor_id)})
-        except:
-            pass
-
-        vehicles_cursor = list(db.vehicles.find(search_query))
-        print(f"DEBUG: Found {len(vehicles_cursor)} vehicles for query: {search_query}")
+        # Find active vehicles for this vendor
+        query = {'vendor_id': vendor_id, 'is_available': True}
+        vehicles_cursor = db.vehicles.find(query)
         
         vehicles = []
         for v in vehicles_cursor:
             v['_id'] = str(v['_id'])
-            if 'vendor_id' in v:
-                v['vendor_id'] = str(v['vendor_id'])
             vehicles.append(v)
             
         return jsonify({'vehicles': vehicles, 'count': len(vehicles)}), 200
@@ -356,5 +335,5 @@ def verify_qr_route(vendor_id):
 def update_ride_status_route(vendor_id):
     return update_ride_status(vendor_id)
 
-if __name__ == "__main__":
-    app.run(debug=True)
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=5000)
