@@ -11,3 +11,4 @@ qrcode
 pillow
 werkzeug
 python-dotenv
+gunicorn
