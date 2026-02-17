@@ -43,8 +43,6 @@ env/
 .env.production
 .env.test
 *.env
-config.py
-database.py
 
 # IDE and Editor directories
 .vscode/*
