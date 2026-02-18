@@ -5,6 +5,7 @@ import bcrypt
 from datetime import datetime, timedelta
 from bson import ObjectId
 import traceback
+from config import Config
 
 def add_vendor():
     """
@@ -203,7 +204,7 @@ def vendor_login():
             'username': vendor['username'],
             'role': vendor.get('role', 'vendor'),
             'exp': datetime.utcnow() + timedelta(hours=24)
-        }, 'your-secret-key', algorithm='HS256')
+        }, Config.SECRET_KEY, algorithm='HS256')
 
         return jsonify({
             'message': 'Login successful',

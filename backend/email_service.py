@@ -1,7 +1,7 @@
-from config import RESEND_APIKEY
+from config import Config
 import resend
 
-resend.api_key = RESEND_APIKEY 
+resend.api_key = Config.RESEND_APIKEY 
 
 def otp_sending_function(email, OTP):
     try:
