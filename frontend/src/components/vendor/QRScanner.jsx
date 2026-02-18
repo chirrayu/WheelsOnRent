@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Html5QrcodeScanner, Html5QrcodeScanType } from 'html5-qrcode';
+import API_BASE_URL from '../../apiConfig';
 
 const QRScanner = () => {
     const [scanResult, setScanResult] = useState(null);
@@ -87,7 +88,7 @@ const QRScanner = () => {
         setBookingDetails(null);
 
         try {
-            const response = await fetch('http://localhost:5000/vendor/qr/verify', {
+            const response = await fetch(`${API_BASE_URL}/vendor/qr/verify`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -123,7 +124,7 @@ const QRScanner = () => {
         setSuccess('');
 
         try {
-            const response = await fetch('http://localhost:5000/vendor/ride/status', {
+            const response = await fetch(`${API_BASE_URL}/vendor/ride/status`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

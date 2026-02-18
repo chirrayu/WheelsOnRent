@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import API_BASE_URL from '../apiConfig';
 import './DL_upload.css';
 
 const DLUpload = () => {
@@ -31,7 +32,7 @@ const DLUpload = () => {
 
   const fetchDlStatus = async () => {
     try {
-      const response = await fetch('http://localhost:5000/dl/status', {
+      const response = await fetch(`${API_BASE_URL}/dl/status`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -121,7 +122,7 @@ const DLUpload = () => {
       dlFormData.append('image', files.dlFile);
       dlFormData.append('dl_number', formData.dlNumber);
 
-      const response = await fetch('http://localhost:5000/dl/upload', {
+      const response = await fetch(`${API_BASE_URL}/dl/upload`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`

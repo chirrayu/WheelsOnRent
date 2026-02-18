@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import API_BASE_URL from '../apiConfig';
 
 const AddVendor = () => {
   const [formData, setFormData] = useState({
     name: '', email: '', username: '', password: '', confirmPassword: '', phone: '', location_id: ''
   });
-  
+
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
@@ -26,10 +27,10 @@ const AddVendor = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    
+
     // 1. Enhanced Validation
     const { name, email, username, password, confirmPassword, phone, location_id } = formData;
-    
+
     if (!name.trim() || !email.trim() || !username.trim() || !password) {
       return setError('All required fields must be filled');
     }
@@ -43,8 +44,8 @@ const AddVendor = () => {
     setLoading(true);
 
     try {
-      // Fixed API URL - no more process.env
-      const response = await fetch('http://localhost:5000/team/add-vendor', {
+      // Use API_BASE_URL
+      const response = await fetch(`${API_BASE_URL}/team/add-vendor`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -80,10 +81,10 @@ const AddVendor = () => {
     <div style={styles.container}>
       <div style={styles.card}>
         <h2 style={styles.title}>Add New Vendor</h2>
-        
+
         {error && <div style={styles.errorBanner}>{error}</div>}
         {success && <div style={styles.successBanner}>{success}</div>}
-        
+
         <form onSubmit={handleSubmit}>
           <div style={styles.inputGroup}>
             <label style={styles.label}>Vendor Name *</label>

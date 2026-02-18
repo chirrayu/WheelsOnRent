@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import API_BASE_URL from '../apiConfig';
 import './PasswordReset.css';
 
 const PasswordReset = () => {
@@ -24,23 +25,23 @@ const PasswordReset = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       return;
     }
-    
+
     if (password.length < 6) {
       setError('Password must be at least 6 characters long');
       return;
     }
-    
+
     setLoading(true);
     setError('');
     setSuccess('');
 
     try {
-      const response = await fetch('http://localhost:5000/reset-password', {
+      const response = await fetch(`${API_BASE_URL}/reset-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -55,7 +56,7 @@ const PasswordReset = () => {
 
       if (response.ok) {
         setSuccess(data.message || 'Password has been reset successfully! Redirecting to login...');
-        
+
         // Redirect to login after a delay
         setTimeout(() => {
           navigate('/login');
@@ -79,7 +80,7 @@ const PasswordReset = () => {
           <div className="alert alert-error">
             The password reset link is invalid or has expired. Please request a new link.
           </div>
-          <button 
+          <button
             className="btn btn-primary"
             onClick={() => navigate('/login')}
           >
@@ -94,10 +95,10 @@ const PasswordReset = () => {
     <div className="password-reset-page">
       <div className="password-reset-container">
         <h2>Reset Password</h2>
-        
+
         {error && <div className="alert alert-error">{error}</div>}
         {success && <div className="alert alert-success">{success}</div>}
-        
+
         <form className="password-reset-form" onSubmit={handleSubmit}>
           <div className="form-group">
             <label htmlFor="password">New Password:</label>
@@ -112,7 +113,7 @@ const PasswordReset = () => {
               required
             />
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="confirmPassword">Confirm New Password:</label>
             <input
@@ -126,16 +127,16 @@ const PasswordReset = () => {
               required
             />
           </div>
-          
-          <button 
-            type="submit" 
+
+          <button
+            type="submit"
             className="btn btn-primary"
             disabled={loading}
           >
             {loading ? 'Resetting Password...' : 'Reset Password'}
           </button>
         </form>
-        
+
         <div className="login-link">
           Remember your password? <a href="/login">Back to Login</a>
         </div>

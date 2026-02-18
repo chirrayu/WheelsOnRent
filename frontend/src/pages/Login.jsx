@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App'; // Import the auth context
+import API_BASE_URL from '../apiConfig';
 import './Login.css';
 
 const Login = () => {
@@ -26,18 +27,18 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Simple validation
     if (!credentials.email || !credentials.password) {
       setError('Please enter both email and password');
       return;
     }
-    
+
     setLoading(true);
     setError('');
 
     try {
-      const response = await fetch('http://localhost:5000/login', {
+      const response = await fetch(`${API_BASE_URL}/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -53,18 +54,18 @@ const Login = () => {
       if (response.ok) {
         // Extract user info and token from response
         const { token, user } = data;
-        
+
         // Save token to localStorage (or sessionStorage)
         localStorage.setItem('token', token);
-        
+
         // Log in the user in the context
-        login({ 
-          email: user.email, 
+        login({
+          email: user.email,
           role: user.role,
           name: user.name,
           id: user.id
         });
-        
+
         // Navigate based on role
         if (user.role === 'admin') {
           navigate('/admin-panel/dashboard');
@@ -88,18 +89,18 @@ const Login = () => {
 
   const handleForgotPasswordSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!forgotPasswordEmail) {
       setError('Please enter your email address');
       return;
     }
-    
+
     setLoading(true);
     setError('');
     setSuccess('');
 
     try {
-      const response = await fetch('http://localhost:5000/forgot-password', {
+      const response = await fetch(`${API_BASE_URL}/forgot-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -138,7 +139,7 @@ const Login = () => {
           <h2>Reset Password</h2>
           {error && <div className="alert alert-error">{error}</div>}
           {success && <div className="alert alert-success">{success}</div>}
-          
+
           <form className="login-form" onSubmit={handleForgotPasswordSubmit}>
             <div className="form-group">
               <label htmlFor="forgot-email">Email:</label>
@@ -153,19 +154,19 @@ const Login = () => {
                 required
               />
             </div>
-            
-            <button 
-              type="submit" 
+
+            <button
+              type="submit"
               className="btn btn-primary"
               disabled={loading}
             >
               {loading ? 'Sending...' : 'Send Reset Link'}
             </button>
           </form>
-          
+
           <div className="back-to-login">
-            <button 
-              type="button" 
+            <button
+              type="button"
               className="btn btn-secondary"
               onClick={handleBackToLogin}
             >
@@ -182,7 +183,7 @@ const Login = () => {
       <div className="login-container">
         <h2>Login</h2>
         {error && <div className="alert alert-error">{error}</div>}
-        
+
         <form className="login-form" onSubmit={handleSubmit}>
           <div className="form-group">
             <label htmlFor="email">Email:</label>
@@ -196,7 +197,7 @@ const Login = () => {
               required
             />
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="password">Password:</label>
             <input
@@ -209,23 +210,23 @@ const Login = () => {
               required
             />
           </div>
-          
-          <button 
-            type="submit" 
+
+          <button
+            type="submit"
             className="btn btn-primary"
             disabled={loading}
           >
             {loading ? 'Logging in...' : 'Login'}
           </button>
         </form>
-        
+
         <div className="signup-link">
           Don't have an account? <a href="/register">Sign up here</a>
         </div>
-        
+
         <div className="forgot-password-link">
-          <button 
-            type="button" 
+          <button
+            type="button"
             onClick={() => setShowForgotPassword(true)}
             className="link-button"
           >
