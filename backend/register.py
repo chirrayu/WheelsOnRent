@@ -7,6 +7,7 @@ import random
 from bson import ObjectId
 import traceback
 from email_service import otp_sending_function
+from config import Config
         
 
 def register_user():
@@ -65,7 +66,7 @@ def register_user():
             'user_id': user_id,
             'email': email,
             'exp': datetime.utcnow() + timedelta(minutes=10)  # Token valid for 10 mins during registration
-        }, 'your-secret-key', algorithm='HS256')
+        }, Config.SECRET_KEY, algorithm='HS256')
 
         return jsonify({
             'message': 'User registered successfully. Please verify your email using the OTP sent.',
@@ -120,7 +121,7 @@ def verify_otp():
             'email': user['email'],
             'role': user.get('role', 'user'),
             'exp': datetime.utcnow() + timedelta(hours=24)
-        }, 'your-secret-key', algorithm='HS256')
+        }, Config.SECRET_KEY, algorithm='HS256')
 
         return jsonify({
             'message': 'Email verified successfully. Registration complete!',

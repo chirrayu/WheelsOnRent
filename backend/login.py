@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from bson import ObjectId
 import traceback
 from email_service import password_reset
+from config import Config
 
 def login_user():
     """
@@ -37,7 +38,7 @@ def login_user():
                 'email': user['email'],
                 'role': user.get('role', 'user'),
                 'exp': datetime.utcnow() + timedelta(hours=24)
-            }, 'your-secret-key', algorithm='HS256')
+            }, Config.SECRET_KEY, algorithm='HS256')
 
             return jsonify({
                 'message': 'Login successful',
@@ -74,7 +75,7 @@ def login_user():
                 'email': team_member['email'],
                 'role': team_member.get('role', 'team'),
                 'exp': datetime.utcnow() + timedelta(hours=24)
-            }, 'your-secret-key', algorithm='HS256')
+            }, Config.SECRET_KEY, algorithm='HS256')
 
             return jsonify({
                 'message': 'Team login successful',
@@ -111,7 +112,7 @@ def login_user():
                 'email': vendor['email'],
                 'role': vendor.get('role', 'vendor'),
                 'exp': datetime.utcnow() + timedelta(hours=24)
-            }, 'your-secret-key', algorithm='HS256')
+            }, Config.SECRET_KEY, algorithm='HS256')
 
             return jsonify({
                 'message': 'Login successful',
@@ -215,10 +216,10 @@ def forgot_password():
                 'user_id': str(user['_id']),
                 'email': user['email'],
                 'exp': datetime.utcnow() + timedelta(hours=1)  # 1 hour expiry
-            }, 'your-secret-key', algorithm='HS256')
+            }, Config.SECRET_KEY, algorithm='HS256')
 
             # Create the reset link
-            reset_link = f"http://localhost:3000/reset-password?token={reset_token}"
+            reset_link = f"{Config.FRONTEND_URL}/reset-password?token={reset_token}"
 
             # Send the password reset email
             email_success = password_reset(email, reset_link)
@@ -237,10 +238,10 @@ def forgot_password():
                 'team_id': str(team_member['_id']),
                 'email': team_member['email'],
                 'exp': datetime.utcnow() + timedelta(hours=1)  # 1 hour expiry
-            }, 'your-secret-key', algorithm='HS256')
+            }, Config.SECRET_KEY, algorithm='HS256')
 
             # Create the reset link
-            reset_link = f"http://localhost:3000/reset-password?token={reset_token}"
+            reset_link = f"{Config.FRONTEND_URL}/reset-password?token={reset_token}"
 
             # Send the password reset email
             email_success = password_reset(email, reset_link)
@@ -259,10 +260,10 @@ def forgot_password():
                 'vendor_id': str(vendor['_id']),
                 'email': vendor['email'],
                 'exp': datetime.utcnow() + timedelta(hours=1)  # 1 hour expiry
-            }, 'your-secret-key', algorithm='HS256')
+            }, Config.SECRET_KEY, algorithm='HS256')
 
             # Create the reset link
-            reset_link = f"http://localhost:3000/reset-password?token={reset_token}"
+            reset_link = f"{Config.FRONTEND_URL}/reset-password?token={reset_token}"
 
             # Send the password reset email
             email_success = password_reset(email, reset_link)
@@ -297,7 +298,7 @@ def reset_password():
 
         try:
             # Decode the reset token
-            decoded_token = jwt.decode(reset_token, 'your-secret-key', algorithms=['HS256'])
+            decoded_token = jwt.decode(reset_token, Config.SECRET_KEY, algorithms=['HS256'])
             
             # Determine which collection to use based on token type
             if 'user_id' in decoded_token:

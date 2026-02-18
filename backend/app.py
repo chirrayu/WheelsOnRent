@@ -10,12 +10,14 @@ from ride_history import get_user_bookings, create_booking, cancel_booking, get_
 from qr import get_booking_qr, verify_qr, update_ride_status
 import jwt
 from functools import wraps
+from config import Config
 import database
+
 app = Flask(__name__)
 CORS(app)
 
-# Secret key for JWT
-app.config['SECRET_KEY'] = 'your-secret-key'  # Change this to a strong secret in production
+# Secret key for JWT from centralized config
+app.config['SECRET_KEY'] = Config.SECRET_KEY
 
 # Token decorator for protected routes
 def token_required(f):
