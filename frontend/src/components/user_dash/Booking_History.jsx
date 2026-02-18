@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import API_BASE_URL from '../../apiConfig';
 import './Booking_History.css';
 
 const Booking_History = () => {
@@ -13,7 +14,7 @@ const Booking_History = () => {
 
   const fetchBookings = async () => {
     try {
-      const response = await fetch('http://localhost:5000/bookings', {
+      const response = await fetch(`${API_BASE_URL}/bookings`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -38,7 +39,7 @@ const Booking_History = () => {
     if (!window.confirm('Are you sure you want to cancel this booking?')) return;
 
     try {
-      const response = await fetch('http://localhost:5000/bookings/cancel', {
+      const response = await fetch(`${API_BASE_URL}/bookings/cancel`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -64,7 +65,7 @@ const Booking_History = () => {
     setQrModal({ open: true, qrCode: null, bookingId, loading: true });
 
     try {
-      const response = await fetch(`http://localhost:5000/bookings/qr?booking_id=${bookingId}`, {
+      const response = await fetch(`${API_BASE_URL}/bookings/qr?booking_id=${bookingId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }

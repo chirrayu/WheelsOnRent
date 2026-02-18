@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Vendors from './Vendors';
+import API_BASE_URL from '../../apiConfig';
 import './Dashboard.css';
 
 const Dashboard = () => {
@@ -13,7 +14,7 @@ const Dashboard = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await fetch('http://localhost:5000/bookings', {
+      const response = await fetch(`${API_BASE_URL}/bookings`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -26,7 +27,7 @@ const Dashboard = () => {
       }
 
       // Fetch DL Status
-      const dlResponse = await fetch('http://localhost:5000/dl/status', {
+      const dlResponse = await fetch(`${API_BASE_URL}/dl/status`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -71,7 +72,7 @@ const Dashboard = () => {
           <div style={{ ...styles.statIcon, color: stats.dlVerified ? '#10b981' : '#f59e0b' }}>
             {stats.dlVerified ? '✅' : '🆔'}
           </div>
-          <div style={styles.statInfo}>
+          <div style={stats.statInfo}>
             <h3 style={{ ...styles.statNumber, fontSize: '1.25rem' }}>
               {stats.dlVerified ? 'Verified' : 'Verify DL'}
             </h3>

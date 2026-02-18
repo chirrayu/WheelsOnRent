@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import API_BASE_URL from '../../apiConfig';
 import './Vendors.css';
 
 const Vendors = () => {
@@ -34,7 +35,7 @@ const Vendors = () => {
 
   const fetchVendors = async () => {
     try {
-      const response = await fetch('http://localhost:5000/vendors', {
+      const response = await fetch(`${API_BASE_URL}/vendors`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await response.json();
@@ -50,7 +51,7 @@ const Vendors = () => {
   const fetchVendorVehicles = async (vendorId) => {
     setLoadingVehicles(true);
     try {
-      const response = await fetch(`http://localhost:5000/vehicles/vendor/${vendorId}`, {
+      const response = await fetch(`${API_BASE_URL}/vehicles/vendor/${vendorId}`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
       const data = await response.json();
@@ -112,7 +113,7 @@ const Vendors = () => {
       // Start date is now, end date is TBD (calculated on return)
       const now = new Date().toISOString();
 
-      const response = await fetch('http://localhost:5000/bookings', {
+      const response = await fetch(`${API_BASE_URL}/bookings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

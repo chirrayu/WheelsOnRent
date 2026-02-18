@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import API_BASE_URL from '../apiConfig';
 import './register.css'; // Import CSS in the component file, not in App.jsx
 
 const Registration = () => {
@@ -10,12 +11,12 @@ const Registration = () => {
     confirmPassword: '',
     phone: ''
   });
-  
+
   const [otpData, setOtpData] = useState({
     user_id: '',
     otp: ''
   });
-  
+
   const [currentStep, setCurrentStep] = useState('registration'); // 'registration' or 'verification'
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -38,24 +39,24 @@ const Registration = () => {
 
   const handleRegistration = async (e) => {
     e.preventDefault();
-    
+
     // Validation
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
       return;
     }
-    
+
     if (formData.password.length < 6) {
       setError('Password must be at least 6 characters long');
       return;
     }
-    
+
     setLoading(true);
     setError('');
     setSuccess('');
 
     try {
-      const response = await fetch('http://localhost:5000/register', {
+      const response = await fetch(`${API_BASE_URL}/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -76,7 +77,7 @@ const Registration = () => {
           ...otpData,
           user_id: data.user_id // Store user ID for verification step
         });
-        
+
         // Move to verification step after a short delay
         setTimeout(() => {
           setCurrentStep('verification');
@@ -95,13 +96,13 @@ const Registration = () => {
 
   const handleOtpVerification = async (e) => {
     e.preventDefault();
-    
+
     setLoading(true);
     setError('');
     setSuccess('');
 
     try {
-      const response = await fetch('http://localhost:5000/verify-otp', {
+      const response = await fetch(`${API_BASE_URL}/verify-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -116,7 +117,7 @@ const Registration = () => {
 
       if (response.ok) {
         setSuccess(data.message || 'Email verified successfully! Redirecting to login...');
-        
+
         // Navigate to login after a delay
         setTimeout(() => {
           navigate('/login');
@@ -137,7 +138,7 @@ const Registration = () => {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:5000/resend-otp', {
+      const response = await fetch(`${API_BASE_URL}/resend-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -173,10 +174,10 @@ const Registration = () => {
       <div className="register-page">
         <div className="register-container">
           <h2>Verify Your Email</h2>
-          
+
           {error && <div className="alert alert-error">{error}</div>}
           {success && <div className="alert alert-success">{success}</div>}
-          
+
           <form className="register-form" onSubmit={handleOtpVerification}>
             <div className="form-group">
               <label htmlFor="otp">Enter OTP:</label>
@@ -191,17 +192,17 @@ const Registration = () => {
                 required
               />
             </div>
-            
-            <button 
-              type="submit" 
+
+            <button
+              type="submit"
               className="btn btn-primary"
               disabled={loading}
             >
               {loading ? 'Verifying...' : 'Verify OTP'}
             </button>
-            
-            <button 
-              type="button" 
+
+            <button
+              type="button"
               className="btn btn-secondary"
               onClick={handleResendOtp}
               disabled={loading}
@@ -209,9 +210,9 @@ const Registration = () => {
             >
               Resend OTP
             </button>
-            
-            <button 
-              type="button" 
+
+            <button
+              type="button"
               className="btn btn-secondary"
               onClick={goBackToRegistration}
               style={{ marginTop: '10px' }}
@@ -228,10 +229,10 @@ const Registration = () => {
     <div className="register-page">
       <div className="register-container">
         <h2>Register</h2>
-        
+
         {error && <div className="alert alert-error">{error}</div>}
         {success && <div className="alert alert-success">{success}</div>}
-        
+
         <form className="register-form" onSubmit={handleRegistration}>
           <div className="form-group">
             <label htmlFor="name">Full Name:</label>
@@ -245,7 +246,7 @@ const Registration = () => {
               required
             />
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="email">Email:</label>
             <input
@@ -258,7 +259,7 @@ const Registration = () => {
               required
             />
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="phone">Phone Number:</label>
             <input
@@ -271,7 +272,7 @@ const Registration = () => {
               required
             />
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="password">Password:</label>
             <input
@@ -284,7 +285,7 @@ const Registration = () => {
               required
             />
           </div>
-          
+
           <div className="form-group">
             <label htmlFor="confirmPassword">Confirm Password:</label>
             <input
@@ -297,16 +298,16 @@ const Registration = () => {
               required
             />
           </div>
-          
-          <button 
-            type="submit" 
+
+          <button
+            type="submit"
             className="btn btn-primary"
             disabled={loading}
           >
             {loading ? 'Registering...' : 'Register'}
           </button>
         </form>
-        
+
         <div className="login-link">
           Already have an account? <a href="/login">Login here</a>
         </div>

@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../App';
 import QRScanner from '../components/vendor/QRScanner';
 import './VendorPanel.css';
+import API_BASE_URL from '../apiConfig';
 
 const VendorPanel = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -73,7 +74,7 @@ const VendorPanel = () => {
   const fetchVehicles = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:5000/vendor/vehicles', {
+      const response = await fetch(`${API_BASE_URL}/vendor/vehicles`, {
         headers: { 'Authorization': `Bearer ${getToken()}` }
       });
       const data = await response.json();
@@ -90,7 +91,7 @@ const VendorPanel = () => {
 
   const fetchBookings = async () => {
     try {
-      const response = await fetch('http://localhost:5000/vendor/bookings', {
+      const response = await fetch(`${API_BASE_URL}/vendor/bookings`, {
         headers: { 'Authorization': `Bearer ${getToken()}` }
       });
       const data = await response.json();
@@ -116,7 +117,7 @@ const VendorPanel = () => {
 
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:5000/vendor/vehicles', {
+      const response = await fetch(`${API_BASE_URL}/vendor/vehicles`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

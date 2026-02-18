@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
+import API_BASE_URL from '../apiConfig';
 import './MyTeamPanel.css';
 
 const MyTeamPanel = () => {
@@ -15,20 +16,20 @@ const MyTeamPanel = () => {
       navigate('/login');
       return;
     }
-    
+
     fetchVendors();
   }, []);
 
   const fetchVendors = async () => {
     try {
-      const response = await fetch('http://localhost:5000/team/vendors', {
+      const response = await fetch(`${API_BASE_URL}/team/vendors`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       });
-      
+
       const data = await response.json();
-      
+
       if (response.ok) {
         setVendors(data.vendors || []);
       }
@@ -50,7 +51,7 @@ const MyTeamPanel = () => {
         <h3>Welcome, {user?.name || 'Team Member'}!</h3>
         <p>You are logged in as a team member.</p>
       </div>
-      
+
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-icon">
@@ -61,7 +62,7 @@ const MyTeamPanel = () => {
             <p>Total Vendors</p>
           </div>
         </div>
-        
+
         <div className="stat-card">
           <div className="stat-icon">
             <span>✅</span>
@@ -71,7 +72,7 @@ const MyTeamPanel = () => {
             <p>Active Vendors</p>
           </div>
         </div>
-        
+
         <div className="stat-card">
           <div className="stat-icon">
             <span>❌</span>
@@ -89,14 +90,14 @@ const MyTeamPanel = () => {
     <div className="vendors-content">
       <div className="vendors-header">
         <h3>Manage Vendors</h3>
-        <button 
+        <button
           className="btn btn-primary"
           onClick={() => navigate('/team/add-vendor')}
         >
           + Add New Vendor
         </button>
       </div>
-      
+
       {loading ? (
         <div className="loading">Loading vendors...</div>
       ) : (
@@ -130,7 +131,7 @@ const MyTeamPanel = () => {
                       <td>{new Date(vendor.created_at).toLocaleDateString()}</td>
                       <td>
                         <div className="action-buttons">
-                          <button 
+                          <button
                             className="btn btn-sm btn-edit"
                             onClick={() => {
                               // Edit vendor logic
@@ -138,18 +139,18 @@ const MyTeamPanel = () => {
                           >
                             Edit
                           </button>
-                          <button 
+                          <button
                             className="btn btn-sm btn-delete"
                             onClick={async () => {
                               if (window.confirm('Are you sure you want to delete this vendor?')) {
                                 try {
-                                  const response = await fetch(`http://localhost:5000/team/vendor/${vendor._id}`, {
+                                  const response = await fetch(`${API_BASE_URL}/team/vendor/${vendor._id}`, {
                                     method: 'DELETE',
                                     headers: {
                                       'Authorization': `Bearer ${localStorage.getItem('token')}`
                                     }
                                   });
-                                  
+
                                   if (response.ok) {
                                     fetchVendors(); // Refresh the list
                                   }
@@ -173,7 +174,7 @@ const MyTeamPanel = () => {
               <span className="icon">👥</span>
               <h4>No vendors found</h4>
               <p>Start by adding your first vendor to the system.</p>
-              <button 
+              <button
                 className="btn btn-primary"
                 onClick={() => navigate('/team/add-vendor')}
               >
@@ -192,7 +193,7 @@ const MyTeamPanel = () => {
         <div className="sidebar-header">
           <h2>Team Panel</h2>
         </div>
-        
+
         <div className="user-profile">
           <div className="user-avatar">
             <span>👤</span>
@@ -202,10 +203,10 @@ const MyTeamPanel = () => {
             <span className="user-role">{user?.role || 'Team'}</span>
           </div>
         </div>
-        
+
         <ul className="nav-menu">
           <li>
-            <button 
+            <button
               className={`nav-link ${activeTab === 'dashboard' ? 'active' : ''}`}
               onClick={() => setActiveTab('dashboard')}
             >
@@ -214,7 +215,7 @@ const MyTeamPanel = () => {
             </button>
           </li>
           <li>
-            <button 
+            <button
               className={`nav-link ${activeTab === 'vendors' ? 'active' : ''}`}
               onClick={() => setActiveTab('vendors')}
             >
@@ -223,7 +224,7 @@ const MyTeamPanel = () => {
             </button>
           </li>
           <li>
-            <button 
+            <button
               className={`nav-link ${activeTab === 'reports' ? 'active' : ''}`}
               onClick={() => setActiveTab('reports')}
             >
@@ -232,7 +233,7 @@ const MyTeamPanel = () => {
             </button>
           </li>
           <li>
-            <button 
+            <button
               className="nav-link logout-btn"
               onClick={handleLogout}
             >
@@ -251,7 +252,7 @@ const MyTeamPanel = () => {
             {activeTab === 'reports' && 'Reports & Analytics'}
           </h1>
         </header>
-        
+
         <div className="content-wrapper">
           {activeTab === 'dashboard' && renderDashboard()}
           {activeTab === 'vendors' && renderVendors()}
