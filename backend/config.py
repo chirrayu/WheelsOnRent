@@ -27,4 +27,11 @@ class Config:
              print("WARNING: ImageKit configuration missing. Image uploads will fail.")
 
 # Validate configuration on import
-# Config.validate() 
+# Backwards compatibility exports
+SECRET_KEY = Config.SECRET_KEY
+MONGO_URI = Config.MONGO_URI
+FRONTEND_URL = Config.FRONTEND_URL
+RESEND_APIKEY = Config.RESEND_APIKEY
+IMAGEKIT_PUBLIC_KEY = Config.IMAGEKIT_PUBLIC_KEY
+IMAGEKIT_PRIVATE_KEY = Config.IMAGEKIT_PRIVATE_KEY
+IMAGEKIT_URL_ENDPOINT = Config.IMAGEKIT_URL_ENDPOINT

@@ -5,6 +5,7 @@ import bcrypt
 from datetime import datetime, timedelta
 from bson import ObjectId
 import traceback
+from config import Config
 
 def team_login():
     """
@@ -44,7 +45,7 @@ def team_login():
             'email': team_member['email'],
             'role': team_member.get('role', 'team'),
             'exp': datetime.utcnow() + timedelta(hours=24)
-        }, 'your-secret-key', algorithm='HS256')
+        }, Config.SECRET_KEY, algorithm='HS256')
 
         return jsonify({
             'message': 'Team login successful',
