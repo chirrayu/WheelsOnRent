@@ -14,7 +14,23 @@ from config import Config
 import database
 
 app = Flask(__name__)
-CORS(app)
+
+# Enhanced CORS configuration
+CORS(app, 
+     resources={r"/*": {
+         "origins": [
+             "http://localhost:3000",
+             "http://localhost:5173",
+             "http://127.0.0.1:3000",
+             "http://127.0.0.1:5173",
+             Config.FRONTEND_URL  # From your config
+         ],
+         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+         "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
+         "expose_headers": ["Content-Type", "Authorization"],
+         "supports_credentials": True,
+         "max_age": 3600
+     }})
 
 # Secret key for JWT from centralized config
 app.config['SECRET_KEY'] = Config.SECRET_KEY
