@@ -5,7 +5,6 @@ from login import login_user, get_profile, forgot_password, reset_password
 from logout import logout_user
 from team_panel import add_vendor, get_all_vendors, update_vendor, delete_vendor, vendor_login, get_all_team_members
 from vendor_panel import get_vendor_profile, update_vendor_profile, get_vendor_vehicles, add_vehicle_to_vendor, get_vendor_bookings
-from dl_upload import upload_dl, get_dl_status
 from ride_history import get_user_bookings, create_booking, cancel_booking, get_available_vehicles
 from qr import get_booking_qr, verify_qr, update_ride_status
 import jwt
@@ -22,7 +21,7 @@ CORS(app,
          "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
          "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
          "expose_headers": ["Content-Type", "Authorization"],
-         "supports_credentials": True,
+         "supports_credentials": False, # Set to False for wildcard compatibility
          "max_age": 3600
      }})
 
@@ -162,19 +161,8 @@ def forgot_pass():
 def reset_pass():
     return reset_password()
 
-# ==========================================
-# DL UPLOAD ROUTES
-# ==========================================
 
-@app.route('/dl/upload', methods=['POST'])
-@token_required
-def upload_dl_route(current_user_id):
-    return upload_dl(current_user_id)
-
-@app.route('/dl/status', methods=['GET'])
-@token_required
-def get_dl_status_route(current_user_id):
-    return get_dl_status(current_user_id)
+# S3-Only storage enforced. Local serving routes removed.
 
 # ==========================================
 # BOOKING / RIDE HISTORY ROUTES
@@ -327,6 +315,12 @@ def add_vehicle_to_vendor_route(vendor_id):
 @vendor_token_required
 def get_vendor_bookings_route(vendor_id):
     return get_vendor_bookings(vendor_id)
+
+@app.route('/vendor/vehicle/<vehicle_id>', methods=['PUT'])
+@vendor_token_required
+def update_vehicle_route(vendor_id, vehicle_id):
+    from vendor_panel import update_vehicle_by_vendor
+    return update_vehicle_by_vendor(vendor_id, vehicle_id)
 
 # ==========================================
 # QR CODE ROUTES

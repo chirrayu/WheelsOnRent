@@ -7,6 +7,7 @@ import API_BASE_URL from '../apiConfig';
 
 const VendorPanel = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -19,8 +20,12 @@ const VendorPanel = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // Bill/Receipt State
+  const [billInfo, setBillInfo] = useState(null);
+
   // Add vehicle form
   const [showAddVehicle, setShowAddVehicle] = useState(false);
+  const [editingVehicle, setEditingVehicle] = useState(null);
   const [vehicleForm, setVehicleForm] = useState({
     vehicle_type: '',
     model: '',
@@ -40,14 +45,11 @@ const VendorPanel = () => {
       return;
     }
 
-    // Update active tab based on URL
     const path = location.pathname;
     if (path.includes('/vendor-panel/vehicles')) {
       setActiveTab('vehicles');
     } else if (path.includes('/vendor-panel/bookings')) {
       setActiveTab('bookings');
-    } else if (path.includes('/vendor-panel/pricing')) {
-      setActiveTab('pricing');
     } else if (path.includes('/vendor-panel/qr-scan')) {
       setActiveTab('qr-scan');
     } else if (path.includes('/vendor-panel/help')) {
@@ -55,9 +57,9 @@ const VendorPanel = () => {
     } else {
       setActiveTab('dashboard');
     }
-  }, [location.pathname]);
+    setIsSidebarOpen(false); // Auto-close on navigation
+  }, [location.pathname, user, navigate]);
 
-  // Fetch data when tab changes
   useEffect(() => {
     if (activeTab === 'dashboard') {
       fetchVehicles();
@@ -117,8 +119,13 @@ const VendorPanel = () => {
 
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/vendor/vehicles`, {
-        method: 'POST',
+      const url = editingVehicle
+        ? `${API_BASE_URL}/vendor/vehicle/${editingVehicle._id}`
+        : `${API_BASE_URL}/vendor/vehicles`;
+      const method = editingVehicle ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${getToken()}`
@@ -133,13 +140,58 @@ const VendorPanel = () => {
       const data = await response.json();
 
       if (response.ok) {
-        setSuccess('Vehicle added successfully!');
+        setSuccess(editingVehicle ? 'Vehicle updated successfully!' : 'Vehicle added successfully!');
         setShowAddVehicle(false);
+        setEditingVehicle(null);
         setVehicleForm({ vehicle_type: '', model: '', make: '', license_plate: '', daily_rate: '', hourly_rate: '', condtion: '', location: '', fuel_type: 'Petrol', is_available: true });
         fetchVehicles();
         setTimeout(() => setSuccess(''), 3000);
       } else {
-        setError(data.error || 'Failed to add vehicle');
+        setError(data.error || 'Operation failed');
+      }
+    } catch (err) {
+      setError('Network error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateBookingStatus = async (bookingId, newStatus) => {
+    const confirmMessages = {
+      active: 'Approve this booking and start the ride?',
+      completed: 'Complete the ride? The final bill will be generated.',
+      cancelled: 'Reject this booking?'
+    };
+
+    if (!window.confirm(confirmMessages[newStatus] || 'Update status?')) return;
+
+    try {
+      setLoading(true);
+      setError('');
+      const response = await fetch(`${API_BASE_URL}/vendor/ride/status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getToken()}`
+        },
+        body: JSON.stringify({ booking_id: bookingId, status: newStatus })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setSuccess(data.message);
+        if (newStatus === 'completed') {
+          setBillInfo({
+            amount: data.final_amount,
+            duration: data.total_duration,
+            bookingId: bookingId
+          });
+        }
+        fetchBookings();
+        setTimeout(() => setSuccess(''), 3000);
+      } else {
+        setError(data.error || 'Failed to update status');
       }
     } catch (err) {
       setError('Network error. Please try again.');
@@ -157,433 +209,376 @@ const VendorPanel = () => {
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
     { id: 'vehicles', label: 'Vehicles', icon: '🚗' },
     { id: 'bookings', label: 'Bookings', icon: '📅' },
-    { id: 'pricing', label: 'Price Update', icon: '💰' },
-    { id: 'qr-scan', label: 'QR Scanner', icon: '📷' },
+    { id: 'qr-scan', label: 'Scanner', icon: '📷' },
     { id: 'help', label: 'Help', icon: '❓' }
   ];
 
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
+        const activeBookingsList = bookings.filter(b => b.status === 'confirmed' || b.status === 'active');
         return (
-          <div style={{ padding: '24px' }}>
-            <h2>Vendor Dashboard</h2>
-            {success && <div style={inlineStyles.successBanner}>{success}</div>}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '32px' }}>
-              <div style={inlineStyles.statCard}>
-                <div style={{ fontSize: '2rem', color: '#6366f1' }}>🚗</div>
-                <div>
-                  <h3 style={inlineStyles.statNumber}>{dashboardStats.totalVehicles}</h3>
-                  <p style={inlineStyles.statLabel}>Total Vehicles</p>
+          <div className="dash-content-inner">
+            <div className="stats-grid">
+              <div className="stat-card-premium">
+                <div className="stat-icon-wrapper" style={{ background: '#eff6ff', color: '#3b82f6' }}>🚗</div>
+                <div className="stat-info">
+                  <h3>{dashboardStats.totalVehicles}</h3>
+                  <p>Total Fleet</p>
                 </div>
               </div>
-
-              <div style={inlineStyles.statCard}>
-                <div style={{ fontSize: '2rem', color: '#6366f1' }}>📅</div>
-                <div>
-                  <h3 style={inlineStyles.statNumber}>{dashboardStats.activeBookings}</h3>
-                  <p style={inlineStyles.statLabel}>Active Bookings</p>
+              <div className="stat-card-premium">
+                <div className="stat-icon-wrapper" style={{ background: '#ecfdf5', color: '#10b981' }}>⏳</div>
+                <div className="stat-info">
+                  <h3>{activeBookingsList.length}</h3>
+                  <p>Active Rides</p>
                 </div>
               </div>
-
-              <div style={inlineStyles.statCard}>
-                <div style={{ fontSize: '2rem', color: '#6366f1' }}>💰</div>
-                <div>
-                  <h3 style={inlineStyles.statNumber}>₹{dashboardStats.revenue}</h3>
-                  <p style={inlineStyles.statLabel}>Today's Revenue</p>
+              <div className="stat-card-premium">
+                <div className="stat-icon-wrapper" style={{ background: '#fff7ed', color: '#f59e0b' }}>💰</div>
+                <div className="stat-info">
+                  <h3>₹{dashboardStats.revenue}</h3>
+                  <p>Today's Revenue</p>
                 </div>
               </div>
             </div>
 
-            <div style={inlineStyles.whiteCard}>
-              <h3 style={{ margin: '0 0 16px 0', fontSize: '1.25rem', fontWeight: '600', color: '#1e293b' }}>Quick Actions</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-                <button onClick={() => { setActiveTab('vehicles'); setShowAddVehicle(true); navigate('/vendor-panel/vehicles'); }} style={inlineStyles.quickActionBtn('#4f46e5')}>
-                  Add New Vehicle
-                </button>
-                <button onClick={() => { setActiveTab('pricing'); navigate('/vendor-panel/pricing'); }} style={inlineStyles.quickActionBtn('#10b981')}>
-                  Update Pricing
-                </button>
-                <button onClick={() => { setActiveTab('bookings'); navigate('/vendor-panel/bookings'); }} style={inlineStyles.quickActionBtn('#3b82f6')}>
-                  Manage Bookings
+            <div className="white-card-v2" style={{ ...inlineStyles.whiteCard, borderRadius: '24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '700', color: '#1e293b' }}>Ongoing Sessions</h3>
+                <button onClick={() => navigate('/vendor-panel/bookings')} className="btn-premium" style={{ border: '1px solid #e2e8f0', background: 'white', color: '#6366f1', padding: '8px 16px', fontSize: '0.85rem' }}>
+                  View All
                 </button>
               </div>
+              {activeBookingsList.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px' }}>
+                  <div style={{ fontSize: '3rem', opacity: 0.1, marginBottom: '16px' }}>📭</div>
+                  <p style={{ color: '#64748b' }}>No active bookings at the moment.</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {activeBookingsList.slice(0, 5).map(booking => (
+                    <div key={booking._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', backgroundColor: '#f8fafc', borderRadius: '16px', border: '1px solid rgba(226, 232, 240, 0.5)' }}>
+                      <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                        <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+                          {booking.vehicle_type === 'Bike' ? '🏍️' : '🛵'}
+                        </div>
+                        <div>
+                          <span style={{ fontWeight: '700', color: '#1e293b' }}>{booking.vehicle_model}</span>
+                          <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{booking.user_name} • #{booking._id?.slice(-6).toUpperCase()}</div>
+                        </div>
+                      </div>
+                      <span className={`status-badge-v2 ${booking.status === 'active' ? 'badge-available' : 'badge-booked'}`}>
+                        {booking.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         );
 
       case 'vehicles':
+        const startEditing = (vehicle) => {
+          setEditingVehicle(vehicle);
+          setVehicleForm({
+            vehicle_type: vehicle.vehicle_type || '',
+            model: vehicle.model || '',
+            make: vehicle.make || '',
+            license_plate: vehicle.license_plate || '',
+            daily_rate: vehicle.daily_rate || '',
+            hourly_rate: vehicle.hourly_rate || '',
+            condtion: vehicle.condtion || '',
+            location: vehicle.location || '',
+            fuel_type: vehicle.fuel_type || 'Petrol',
+            is_available: vehicle.is_available !== false
+          });
+          setShowAddVehicle(true);
+        };
         return (
-          <div style={{ padding: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-              <h2>Vehicle Management</h2>
-              <button onClick={() => setShowAddVehicle(!showAddVehicle)} style={inlineStyles.primaryBtn}>
+          <div className="dash-content-inner">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+              <h2 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#1e293b', margin: 0 }}>My Vehicles</h2>
+              <button onClick={() => setShowAddVehicle(!showAddVehicle)} className={`btn-premium ${showAddVehicle ? 'btn-danger' : 'btn-primary'}`}>
                 {showAddVehicle ? '✕ Close' : '+ Add Vehicle'}
               </button>
             </div>
 
-            {error && <div style={inlineStyles.errorBanner}>{error}</div>}
-            {success && <div style={inlineStyles.successBanner}>{success}</div>}
-
-            {/* Add Vehicle Form */}
             {showAddVehicle && (
-              <div style={{ ...inlineStyles.whiteCard, marginBottom: '24px' }}>
-                <h3 style={{ margin: '0 0 16px 0' }}>Add New Vehicle</h3>
+              <div style={{ ...inlineStyles.whiteCard, marginBottom: '32px', borderRadius: '24px', border: '1px solid #6366f1' }}>
+                <h3 style={{ margin: '0 0 24px 0', fontSize: '1.25rem', fontWeight: '700' }}>{editingVehicle ? 'Edit Vehicle' : 'Register Vehicle'}</h3>
                 <form onSubmit={handleAddVehicle}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-                    <div>
-                      <label style={inlineStyles.formLabel}>Vehicle Type *</label>
-                      <select value={vehicleForm.vehicle_type} onChange={e => setVehicleForm({ ...vehicleForm, vehicle_type: e.target.value })} style={inlineStyles.formInput} required>
-                        <option value="">Select type</option>
-                        <option value="Scooter">Scooter</option>
-                        <option value="Bike">Bike</option>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px' }}>
+                    <div className="form-group">
+                      <label style={inlineStyles.formLabel}>Type</label>
+                      <select value={vehicleForm.vehicle_type} onChange={e => setVehicleForm({ ...vehicleForm, vehicle_type: e.target.value })} style={{ ...inlineStyles.formInput, borderRadius: '12px' }} required>
+                        <option value="">Select</option>
+                        <option value="Scooter">Scooter 🛵</option>
+                        <option value="Bike">Bike 🏍️</option>
                       </select>
                     </div>
-                    <div>
-                      <label style={inlineStyles.formLabel}>Model *</label>
-                      <input type="text" value={vehicleForm.model} onChange={e => setVehicleForm({ ...vehicleForm, model: e.target.value })} style={inlineStyles.formInput} required />
+                    <div className="form-group">
+                      <label style={inlineStyles.formLabel}>Model</label>
+                      <input type="text" value={vehicleForm.model} onChange={e => setVehicleForm({ ...vehicleForm, model: e.target.value })} style={{ ...inlineStyles.formInput, borderRadius: '12px' }} required />
                     </div>
-                    <div>
-                      <label style={inlineStyles.formLabel}>Make *</label>
-                      <input type="text" value={vehicleForm.make} onChange={e => setVehicleForm({ ...vehicleForm, make: e.target.value })} style={inlineStyles.formInput} required />
+                    <div className="form-group">
+                      <label style={inlineStyles.formLabel}>Make (Brand)</label>
+                      <input type="text" value={vehicleForm.make} onChange={e => setVehicleForm({ ...vehicleForm, make: e.target.value })} style={{ ...inlineStyles.formInput, borderRadius: '12px' }} placeholder="e.g. Honda, Suzuki" required />
                     </div>
-                    <div>
-                      <label style={inlineStyles.formLabel}>License Plate *</label>
-                      <input type="text" value={vehicleForm.license_plate} onChange={e => setVehicleForm({ ...vehicleForm, license_plate: e.target.value })} style={inlineStyles.formInput} required />
-                    </div>
-                    <div>
-                      <label style={inlineStyles.formLabel}>Daily Rate (₹) *</label>
-                      <input type="number" value={vehicleForm.daily_rate} onChange={e => setVehicleForm({ ...vehicleForm, daily_rate: e.target.value })} style={inlineStyles.formInput} required />
-                    </div>
-                    <div>
-                      <label style={inlineStyles.formLabel}>Hourly Rate (₹)</label>
-                      <input type="number" value={vehicleForm.hourly_rate} onChange={e => setVehicleForm({ ...vehicleForm, hourly_rate: e.target.value })} style={inlineStyles.formInput} />
-                    </div>
-                    <div>
-                      <label style={inlineStyles.formLabel}>Location *</label>
-                      <input type="text" value={vehicleForm.location} onChange={e => setVehicleForm({ ...vehicleForm, location: e.target.value })} style={inlineStyles.formInput} required placeholder="e.g. Indiranagar, Bangalore" />
-                    </div>
-                    <div>
+                    <div className="form-group">
                       <label style={inlineStyles.formLabel}>Fuel Type</label>
-                      <select value={vehicleForm.fuel_type} onChange={e => setVehicleForm({ ...vehicleForm, fuel_type: e.target.value })} style={inlineStyles.formInput}>
+                      <select value={vehicleForm.fuel_type} onChange={e => setVehicleForm({ ...vehicleForm, fuel_type: e.target.value })} style={{ ...inlineStyles.formInput, borderRadius: '12px' }}>
                         <option value="Petrol">Petrol</option>
                         <option value="Electric">Electric</option>
                         <option value="Diesel">Diesel</option>
                       </select>
                     </div>
-                    <div>
+                    <div className="form-group">
                       <label style={inlineStyles.formLabel}>Condition</label>
-                      <select value={vehicleForm.condtion} onChange={e => setVehicleForm({ ...vehicleForm, condtion: e.target.value })} style={inlineStyles.formInput}>
-                        <option value="">Select condition</option>
-                        <option value="new">New</option>
-                        <option value="excellent">Excellent</option>
-                        <option value="good">Good</option>
-                        <option value="fair">Fair</option>
-                      </select>
+                      <input type="text" value={vehicleForm.condtion} onChange={e => setVehicleForm({ ...vehicleForm, condtion: e.target.value })} style={{ ...inlineStyles.formInput, borderRadius: '12px' }} placeholder="e.g. Excellent, Good" />
+                    </div>
+                    <div className="form-group">
+                      <label style={inlineStyles.formLabel}>License</label>
+                      <input type="text" value={vehicleForm.license_plate} onChange={e => setVehicleForm({ ...vehicleForm, license_plate: e.target.value })} style={{ ...inlineStyles.formInput, borderRadius: '12px' }} required />
+                    </div>
+                    <div className="form-group">
+                      <label style={inlineStyles.formLabel}>Daily Rate (₹)</label>
+                      <input type="number" value={vehicleForm.daily_rate} onChange={e => setVehicleForm({ ...vehicleForm, daily_rate: e.target.value })} style={{ ...inlineStyles.formInput, borderRadius: '12px' }} required />
+                    </div>
+                    <div className="form-group">
+                      <label style={inlineStyles.formLabel}>Hourly Rate (₹)</label>
+                      <input type="number" value={vehicleForm.hourly_rate} onChange={e => setVehicleForm({ ...vehicleForm, hourly_rate: e.target.value })} style={{ ...inlineStyles.formInput, borderRadius: '12px' }} />
                     </div>
                   </div>
-                  <div style={{ marginTop: '16px' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={vehicleForm.is_available !== false}
-                        onChange={e => setVehicleForm({ ...vehicleForm, is_available: e.target.checked })}
-                      />
-                      <span>Make available for booking immediately</span>
-                    </label>
-                  </div>
-                  <button type="submit" disabled={loading} style={{ ...inlineStyles.primaryBtn, marginTop: '20px' }}>
-                    {loading ? 'Adding...' : 'Add Vehicle'}
+                  <button type="submit" disabled={loading} className="btn-premium btn-primary" style={{ marginTop: '24px' }}>
+                    {loading ? '...' : (editingVehicle ? 'Update' : 'Save')}
                   </button>
                 </form>
               </div>
             )}
 
-            {/* Vehicle List */}
-            {loading && !showAddVehicle ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>Loading vehicles...</div>
-            ) : vehicles.length === 0 ? (
-              <div style={inlineStyles.whiteCard}>
-                <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                  <div style={{ fontSize: '3rem', marginBottom: '16px' }}>🚗</div>
-                  <p>No vehicles added yet. Click "Add Vehicle" to get started.</p>
-                </div>
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
-                {vehicles.map(vehicle => (
-                  <div key={vehicle._id} style={inlineStyles.whiteCard}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div>
-                        <h3 style={{ margin: '0 0 4px 0', color: '#1e293b' }}>{vehicle.model}</h3>
-                        <p style={{ margin: '0 0 8px 0', color: '#64748b', fontSize: '0.875rem' }}>{vehicle.vehicle_type?.toUpperCase()}</p>
-                      </div>
-                      <span style={{
-                        padding: '4px 10px',
-                        borderRadius: '20px',
-                        fontSize: '0.75rem',
-                        fontWeight: '600',
-                        backgroundColor: vehicle.is_available ? '#ecfdf5' : '#fef2f2',
-                        color: vehicle.is_available ? '#10b981' : '#ef4444'
-                      }}>
-                        {vehicle.is_available ? 'Available' : 'Booked'}
-                      </span>
-                    </div>
-                    <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px', marginTop: '12px' }}>
-                      <p style={{ margin: '0 0 4px 0', fontSize: '0.875rem', color: '#64748b' }}>🔖 {vehicle.license_plate}</p>
-                      <p style={{ margin: '0 0 4px 0', fontSize: '0.875rem', color: '#64748b' }}>💰 ₹{vehicle.daily_rate}/day {vehicle.hourly_rate ? `| ₹${vehicle.hourly_rate}/hr` : ''}</p>
-                      {vehicle.condtion && <p style={{ margin: '0', fontSize: '0.875rem', color: '#64748b' }}>🔧 {vehicle.condtion}</p>}
+            <div className="vehicle-grid">
+              {vehicles.map(v => (
+                <div key={v._id} className="vehicle-card-v2">
+                  <span className={`status-badge-v2 ${v.is_available ? 'badge-available' : 'badge-booked'}`}>
+                    {v.is_available ? 'Ready' : 'In Use'}
+                  </span>
+                  <div style={{ display: 'flex', gap: '16px', marginBottom: '20px' }}>
+                    <div style={{ fontSize: '2rem' }}>{v.vehicle_type === 'Bike' ? '🏍️' : '🛵'}</div>
+                    <div>
+                      <h4 style={{ margin: 0, fontWeight: '700' }}>{v.model}</h4>
+                      <p style={{ margin: 0, color: '#64748b', fontSize: '0.85rem' }}>{v.license_plate}</p>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
+                  <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: '700', color: '#10b981' }}>₹{v.daily_rate}/day</span>
+                      <span style={{ fontWeight: '600', color: '#6366f1', fontSize: '0.9rem' }}>₹{v.hourly_rate}/hr</span>
+                    </div>
+                    <button onClick={() => startEditing(v)} style={{ border: 'none', background: 'none', color: '#94a3b8', fontSize: '0.85rem', cursor: 'pointer', textAlign: 'right', marginTop: '4px' }}>Edit Details</button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         );
 
       case 'bookings':
         return (
-          <div style={{ padding: '24px' }}>
-            <h2>Bookings Management</h2>
-            {bookings.length === 0 ? (
-              <div style={inlineStyles.whiteCard}>
-                <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                  <div style={{ fontSize: '3rem', marginBottom: '16px' }}>📅</div>
-                  <p>No bookings yet.</p>
-                </div>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {bookings.map(booking => (
-                  <div key={booking._id} style={inlineStyles.whiteCard}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <h3 style={{ margin: '0 0 4px 0', color: '#1e293b' }}>Booking #{booking._id?.slice(-6)}</h3>
-                        <p style={{ margin: 0, color: '#64748b', fontSize: '0.875rem' }}>
-                          {booking.start_date} — {booking.end_date}
-                        </p>
-                      </div>
-                      <span style={{
-                        padding: '4px 12px',
-                        borderRadius: '20px',
-                        fontSize: '0.75rem',
-                        fontWeight: '600',
-                        backgroundColor: booking.status === 'confirmed' ? '#dbeafe' : booking.status === 'cancelled' ? '#fef2f2' : '#ecfdf5',
-                        color: booking.status === 'confirmed' ? '#3b82f6' : booking.status === 'cancelled' ? '#ef4444' : '#10b981'
-                      }}>
-                        {booking.status?.toUpperCase()}
-                      </span>
+          <div className="dash-content-inner">
+            <h2 style={{ fontSize: '1.75rem', fontWeight: '800', marginBottom: '32px' }}>Orders</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {bookings.map(b => (
+                <div key={b._id} className="white-card-v2" style={{ ...inlineStyles.whiteCard, borderRadius: '20px', padding: '20px', display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: '20px' }}>
+                  <div style={{ display: 'flex', gap: '20px' }}>
+                    <div style={{ width: '64px', height: '64px', background: '#f8fafc', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem' }}>
+                      {b.vehicle_type === 'Bike' ? '🏍️' : '🛵'}
                     </div>
-                    <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '12px', marginTop: '12px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '8px' }}>
-                      <div><span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>TYPE</span><br />{booking.booking_type || 'daily'}</div>
-                      <div><span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>RATE</span><br />₹{booking.rate || 0}</div>
-                      <div><span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>USER</span><br />{booking.user_id?.slice(-6) || 'N/A'}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-
-      case 'pricing':
-        return (
-          <div style={{ padding: '24px' }}>
-            <h2>Price Update</h2>
-            {vehicles.length === 0 ? (
-              <div style={inlineStyles.whiteCard}>
-                <p style={{ textAlign: 'center', color: '#64748b', padding: '40px' }}>Add vehicles first to update pricing.</p>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {vehicles.map(vehicle => (
-                  <div key={vehicle._id} style={{ ...inlineStyles.whiteCard, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                      <h3 style={{ margin: '0 0 4px 0', color: '#1e293b' }}>{vehicle.model}</h3>
-                      <p style={{ margin: 0, color: '#64748b', fontSize: '0.875rem' }}>{vehicle.license_plate}</p>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <p style={{ margin: '0 0 4px 0', fontWeight: '600', color: '#1e293b' }}>₹{vehicle.daily_rate}/day</p>
-                      <p style={{ margin: 0, color: '#64748b', fontSize: '0.875rem' }}>{vehicle.hourly_rate ? `₹${vehicle.hourly_rate}/hr` : 'No hourly rate'}</p>
+                      <h4 style={{ margin: 0 }}>{b.vehicle_model}</h4>
+                      <p style={{ margin: 0, color: '#64748b', fontSize: '0.9rem' }}>{b.user_name} • {b.user_phone}</p>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: '#94a3b8' }}>{new Date(b.start_date).toLocaleString()}</p>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'flex-end', minWidth: '150px' }}>
+                    <span className={`status-badge-v2 ${b.status === 'active' ? 'badge-available' : 'badge-booked'}`}>
+                      {b.status}
+                    </span>
+                    {b.status === 'confirmed' && <button onClick={() => handleUpdateBookingStatus(b._id, 'active')} className="btn-premium btn-primary" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>Start</button>}
+                    {b.status === 'active' && <button onClick={() => handleUpdateBookingStatus(b._id, 'completed')} className="btn-premium btn-danger" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>Stop</button>}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         );
 
       case 'qr-scan':
         return (
-          <div style={{ padding: '24px' }}>
-            <h2>QR Scanner</h2>
-            <QRScanner />
+          <div className="dash-content-inner">
+            <div style={{ ...inlineStyles.whiteCard, borderRadius: '24px', textAlign: 'center', padding: '40px', maxWidth: '600px', margin: '0 auto' }}>
+              <div style={{ fontSize: '3rem', marginBottom: '16px' }}>📷</div>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: '800', marginBottom: '8px' }}>QR Scanner</h2>
+              <p style={{ color: '#64748b', marginBottom: '32px' }}>Scan the user's booking QR code to start or stop a ride automatically.</p>
+              <div style={{ borderRadius: '24px', overflow: 'hidden', border: '8px solid #f1f5f9' }}>
+                <QRScanner />
+              </div>
+            </div>
           </div>
         );
 
       case 'help':
         return (
-          <div style={{ padding: '24px' }}>
-            <h2>Help & Support</h2>
-            <div style={inlineStyles.whiteCard}>
-              <h3>Frequently Asked Questions</h3>
-              <div style={{ marginTop: '16px' }}>
-                {[
-                  { q: 'How do I add a vehicle?', a: 'Go to Vehicles tab and click "Add Vehicle".' },
-                  { q: 'How do I update pricing?', a: 'Go to the Price Update tab to modify rates.' },
-                  { q: 'How do I manage bookings?', a: 'Go to the Bookings tab to view and manage all bookings.' }
-                ].map((faq, i) => (
-                  <div key={i} style={{ padding: '12px 0', borderBottom: '1px solid #f1f5f9' }}>
-                    <h4 style={{ margin: '0 0 4px 0', color: '#1e293b' }}>{faq.q}</h4>
-                    <p style={{ margin: 0, color: '#64748b', fontSize: '0.875rem' }}>{faq.a}</p>
+          <div className="dash-content-inner">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '32px' }}>
+              <div style={{ ...inlineStyles.whiteCard, borderRadius: '24px' }}>
+                <h3 style={{ margin: '0 0 20px 0', fontSize: '1.25rem', fontWeight: '700' }}>Support Guide</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {[
+                    { q: 'How to start a ride?', a: 'Go to Bookings or Scan QR. Click "Start Ride" after verifying user documents.' },
+                    { q: 'Manual termination?', a: 'If QR fails, use the "Stop" button in the active bookings list.' },
+                    { q: 'Security deposit?', a: 'Collect 1 Original Govt ID (Aadhar/Voter) and verify DL.' }
+                  ].map((item, i) => (
+                    <div key={i} style={{ padding: '16px', background: '#f8fafc', borderRadius: '16px' }}>
+                      <p style={{ margin: '0 0 4px 0', fontWeight: '700', color: '#1e293b' }}>{item.q}</p>
+                      <p style={{ margin: 0, fontSize: '0.9rem', color: '#64748b' }}>{item.a}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div style={{ ...inlineStyles.whiteCard, borderRadius: '24px', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)', color: 'white' }}>
+                <h3 style={{ margin: '0 0 12px 0', fontSize: '1.25rem', fontWeight: '700' }}>Contact Support</h3>
+                <p style={{ fontSize: '0.9rem', opacity: 0.9, marginBottom: '24px' }}>Need urgent assistance with a booking or technical issue?</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <span style={{ fontSize: '1.5rem' }}>📞</span>
+                    <span>+91 999 000 111</span>
                   </div>
-                ))}
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <span style={{ fontSize: '1.5rem' }}>✉️</span>
+                    <span>support@wheelsonrent.com</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         );
 
       default:
-        return (
-          <div style={{ padding: '24px' }}>
-            <h2>Vendor Dashboard</h2>
-            <p>Welcome to your vendor panel!</p>
-          </div>
-        );
+        return null;
     }
   };
 
-  return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: '#f8fafc' }}>
-      {/* Sidebar */}
-      <div style={{
-        width: '280px',
-        backgroundColor: '#6366f1',
-        color: 'white',
-        height: '100vh',
-        position: 'fixed',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
-        <div style={{
-          padding: '24px',
-          borderBottom: '1px solid rgba(255,255,255,0.1)',
-          textAlign: 'center'
-        }}>
-          <h3 style={{ margin: '0', fontSize: '1.5rem', fontWeight: '600' }}>Vendor Panel</h3>
-        </div>
+  const renderBillModal = () => {
+    if (!billInfo) return null;
+    return (
+      <div className="modal-overlay" style={{ zIndex: 2000 }}>
 
-        <nav style={{ flex: 1, paddingTop: '20px' }}>
-          <ul style={{ listStyle: 'none', padding: '0', margin: '0' }}>
-            {menuItems.map(item => (
-              <li key={item.id} style={{ margin: '0' }}>
-                <button
-                  onClick={() => {
-                    setActiveTab(item.id);
-                    navigate(`/vendor-panel/${item.id}`);
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    width: '100%',
-                    padding: '16px 24px',
-                    backgroundColor: activeTab === item.id ? 'rgba(255,255,255,0.1)' : 'transparent',
-                    border: 'none',
-                    color: activeTab === item.id ? 'white' : 'rgba(255,255,255,0.8)',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    fontSize: '0.95rem',
-                    transition: 'all 0.2s ease',
-                    textDecoration: 'none'
-                  }}
-                >
-                  <span style={{ fontSize: '1.2rem' }}>{item.icon}</span>
-                  <span style={{ flex: 1 }}>{item.label}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </nav>
-      </div>
-
-      {/* Main Content */}
-      <div style={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        marginLeft: '280px'
-      }}>
-        <header style={{
-          backgroundColor: 'white',
-          borderBottom: '1px solid #e2e8f0',
-          padding: '0 24px'
-        }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: '20px 0'
-          }}>
-            <h1 style={{
-              margin: '0',
-              fontSize: '1.5rem',
-              fontWeight: '600',
-              color: '#1e293b'
-            }}>
-              {activeTab === 'dashboard' && 'Dashboard'}
-              {activeTab === 'vehicles' && 'Vehicle Management'}
-              {activeTab === 'bookings' && 'Bookings'}
-              {activeTab === 'pricing' && 'Price Update'}
-              {activeTab === 'qr-scan' && 'QR Scanner'}
-              {activeTab === 'help' && 'Help & Support'}
-            </h1>
-            <button
-              onClick={handleLogout}
-              style={{
-                padding: '8px 16px',
-                backgroundColor: '#ef4444',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                cursor: 'pointer'
-              }}
-            >
-              Logout
+        <div style={{ ...inlineStyles.whiteCard, width: '90%', maxWidth: '400px', padding: '0', overflow: 'hidden', borderRadius: '32px' }}>
+          <div style={{ backgroundColor: '#6366f1', color: 'white', padding: '32px 24px', textAlign: 'center' }}>
+            <div style={{ fontSize: '4rem', marginBottom: '16px' }}>🧾</div>
+            <h3 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '800' }}>Ride Completed!</h3>
+            <p style={{ margin: '8px 0 0 0', opacity: 0.8 }}>Booking ID: {billInfo.bookingId.slice(-8).toUpperCase()}</p>
+          </div>
+          <div style={{ padding: '32px 24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', borderBottom: '1px dashed #e2e8f0', paddingBottom: '16px' }}>
+              <span style={{ color: '#64748b' }}>Ride Duration</span>
+              <span style={{ fontWeight: '700', color: '#1e293b' }}>{billInfo.duration}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+              <span style={{ fontSize: '1.1rem', color: '#1e293b', fontWeight: '600' }}>Total Amount</span>
+              <span style={{ fontSize: '2.25rem', fontWeight: '900', color: '#10b981' }}>₹{billInfo.amount}</span>
+            </div>
+            <button onClick={() => setBillInfo(null)} className="btn-premium btn-primary" style={{ width: '100%', padding: '16px' }}>
+              Paid & Confirm
             </button>
+          </div>
+        </div>
+      </div >
+    );
+  };
+
+  return (
+    <div className={`vendor-panel ${isSidebarOpen ? 'sidebar-open' : ''}`}>
+      {/* Mobile Overlay */}
+      {isSidebarOpen && (
+        <div
+          className="mobile-overlay"
+          onClick={() => setIsSidebarOpen(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 999 }}
+        ></div>
+      )}
+
+      <aside className={`vendor-sidebar ${isSidebarOpen ? 'mobile-open' : ''}`}>
+        <div className="sidebar-header">
+          <h2>WHEELS ON RENT</h2>
+        </div>
+        <nav className="nav-menu">
+          {menuItems.map(item => (
+            <div key={item.id} className="nav-item">
+              <button
+                onClick={() => {
+                  setActiveTab(item.id);
+                  navigate(`/vendor-panel/${item.id}`);
+                }}
+                className={`nav-button ${activeTab === item.id ? 'active' : ''}`}
+              >
+                <span style={{ fontSize: '1.2rem' }}>{item.icon}</span>
+                <span>{item.label}</span>
+              </button>
+            </div>
+          ))}
+        </nav>
+        <div className="sidebar-footer">
+          <button onClick={handleLogout} className="btn-premium btn-danger" style={{ width: '100%' }}>
+            🚪 Logout
+          </button>
+        </div>
+      </aside>
+
+      <main className="vendor-main">
+        <header className="vendor-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <button
+              className="mobile-toggle"
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            >
+              {isSidebarOpen ? '✕' : '☰'}
+            </button>
+            <h1>
+              {activeTab === 'dashboard' && 'Success, ' + (user?.name || 'Vendor')}
+              {activeTab === 'vehicles' && 'Vehicle Garage'}
+              {activeTab === 'bookings' && 'Rental Orders'}
+              {activeTab === 'qr-scan' && 'Scan & Go'}
+              {activeTab === 'help' && 'Vendor Help'}
+            </h1>
+          </div>
+          <div className="header-actions">
+            <span style={{ color: '#10b981', background: '#ecfdf5', padding: '6px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '700' }}>
+              ● Online
+            </span>
           </div>
         </header>
 
-        <div style={{
-          flex: 1,
-          backgroundColor: '#f8fafc',
-          padding: '24px'
-        }}>
+        <section className="dash-content">
+          {error && <div style={{ ...inlineStyles.errorBanner, margin: '0 0 24px 0' }}>{error}</div>}
+          {success && <div style={{ ...inlineStyles.successBanner, margin: '0 0 24px 0' }}>{success}</div>}
           {renderContent()}
-        </div>
-      </div>
+        </section>
+
+        {renderBillModal()}
+      </main>
     </div>
   );
 };
 
-// Reusable inline styles
 const inlineStyles = {
-  statCard: {
-    backgroundColor: 'white', borderRadius: '12px', padding: '20px',
-    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
-    display: 'flex', alignItems: 'center', gap: '16px', border: '1px solid #e2e8f0'
-  },
-  statNumber: { margin: '0 0 4px 0', fontSize: '2rem', color: '#1e293b', fontWeight: '700' },
-  statLabel: { margin: '0', color: '#64748b', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.5px' },
-  whiteCard: { backgroundColor: 'white', borderRadius: '12px', padding: '24px', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)' },
-  primaryBtn: { padding: '12px 24px', backgroundColor: '#4f46e5', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: '600', cursor: 'pointer' },
-  quickActionBtn: (bg) => ({ padding: '16px', backgroundColor: bg, color: 'white', border: 'none', borderRadius: '8px', fontSize: '1rem', fontWeight: '500', cursor: 'pointer' }),
-  errorBanner: { padding: '12px', backgroundColor: '#fee', color: '#dc2626', borderRadius: '8px', marginBottom: '16px' },
-  successBanner: { padding: '12px', backgroundColor: '#ecfdf5', color: '#059669', borderRadius: '8px', marginBottom: '16px' },
-  formLabel: { display: 'block', marginBottom: '6px', fontSize: '0.875rem', fontWeight: '500', color: '#374151' },
-  formInput: { width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.9rem', boxSizing: 'border-box' }
+  whiteCard: { backgroundColor: 'white', border: '1px solid rgba(226, 232, 240, 0.8)', boxShadow: '0 10px 30px rgba(0, 0, 0, 0.02)' },
+  formLabel: { display: 'block', marginBottom: '8px', fontSize: '0.85rem', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' },
+  formInput: { width: '100%', padding: '12px 16px', border: '1px solid #e2e8f0', fontSize: '1rem', transition: 'all 0.3s ease' },
+  errorBanner: { padding: '16px', backgroundColor: '#fef2f2', color: '#dc2626', borderRadius: '16px', border: '1px solid #fee2e2', fontWeight: '500' },
+  successBanner: { padding: '16px', backgroundColor: '#f0fdf4', color: '#16a34a', borderRadius: '16px', border: '1px solid #dcfce7', fontWeight: '500' }
 };
 
 export default VendorPanel;

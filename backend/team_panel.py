@@ -24,13 +24,13 @@ def add_vendor():
         location_id = data.get('location_id')  # Optional: assign to specific location
 
         # Validation
-        if not name or not email or not username or not password:
-            return jsonify({'error': 'Name, email, username, and password are required'}), 400
+        if not name or not phone or not username or not password:
+            return jsonify({'error': 'Name, phone number, username, and password are required'}), 400
 
-        # Check if vendor with this email already exists
-        existing_vendor_email = db.vendors.find_one({'email': email})
-        if existing_vendor_email:
-            return jsonify({'error': 'Vendor with this email already exists'}), 409
+        # Check if vendor with this phone already exists
+        existing_vendor_phone = db.vendors.find_one({'phone': phone})
+        if existing_vendor_phone:
+            return jsonify({'error': 'Vendor with this phone number already exists'}), 409
 
         # Check if vendor with this username already exists
         existing_vendor_username = db.vendors.find_one({'username': username})
@@ -119,14 +119,14 @@ def update_vendor(vendor_id):
         if 'is_active' in data:
             update_fields['is_active'] = data['is_active']
         
-        # Check if email already exists for another vendor
-        if 'email' in update_fields:
+        # Check if phone already exists for another vendor
+        if 'phone' in update_fields:
             existing_vendor = db.vendors.find_one({
-                'email': update_fields['email'],
+                'phone': update_fields['phone'],
                 '_id': {'$ne': ObjectId(vendor_id)}
             })
             if existing_vendor:
-                return jsonify({'error': 'Email already exists for another vendor'}), 409
+                return jsonify({'error': 'Phone number already exists for another vendor'}), 409
 
         # Update vendor
         result = db.vendors.update_one(
@@ -173,14 +173,14 @@ def vendor_login():
     try:
         db = get_db()
         data = request.get_json()
-        username = data.get('username')
+        phone = data.get('phone')
         password = data.get('password')
 
-        if not username or not password:
-            return jsonify({'error': 'Username and password are required'}), 400
+        if not phone or not password:
+            return jsonify({'error': 'Phone number and password are required'}), 400
 
-        # Find vendor in database by username
-        vendor = db.vendors.find_one({'username': username})
+        # Find vendor in database by phone
+        vendor = db.vendors.find_one({'phone': phone})
         if not vendor:
             return jsonify({'error': 'Invalid credentials'}), 401
 
@@ -201,7 +201,7 @@ def vendor_login():
         # Generate JWT token
         token = jwt.encode({
             'vendor_id': str(vendor['_id']),
-            'username': vendor['username'],
+            'phone': vendor['phone'],
             'role': vendor.get('role', 'vendor'),
             'exp': datetime.utcnow() + timedelta(hours=24)
         }, Config.SECRET_KEY, algorithm='HS256')
@@ -211,11 +211,11 @@ def vendor_login():
             'token': token,
             'vendor': {
                 'id': str(vendor['_id']),
-                'username': vendor['username'],
+                'phone': vendor['phone'],
                 'name': vendor['name'],
-                'email': vendor['email'],
-                'role': vendor.get('role', 'vendor'),
-                'phone': vendor.get('phone', '')
+                'username': vendor.get('username', ''),
+                'email': vendor.get('email', ''),
+                'role': vendor.get('role', 'vendor')
             }
         }), 200
 

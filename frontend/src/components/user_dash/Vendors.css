@@ -1,0 +1,33 @@
+.modal-scrollbar-refined::-webkit-scrollbar {
+    width: 8px;
+}
+
+.modal-scrollbar-refined::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+
+.modal-scrollbar-refined::-webkit-scrollbar-thumb {
+    background: #6366f1;
+    border-radius: 4px;
+}
+
+.modal-scrollbar-refined::-webkit-scrollbar-thumb:hover {
+    background: #4f46e5;
+}
+
+.vehicle-card-selected {
+    position: relative;
+    overflow: hidden;
+}
+
+.vehicle-card-selected::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 8px;
+    background-color: #6366f1;
+    border-radius: 0 4px 4px 0;
+}

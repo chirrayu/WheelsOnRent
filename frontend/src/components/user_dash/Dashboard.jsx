@@ -6,7 +6,7 @@ import './Dashboard.css';
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [stats, setStats] = useState({ activeBookings: 0, totalSpent: 0, dlVerified: false });
+  const [stats, setStats] = useState({ activeBookings: 0, totalSpent: 0 });
 
   useEffect(() => {
     fetchStats();
@@ -24,17 +24,6 @@ const Dashboard = () => {
         const active = (data.bookings || []).filter(b => b.status === 'confirmed' || b.status === 'active').length;
         const total = (data.bookings || []).reduce((sum, b) => sum + (b.rate || 0), 0);
         setStats({ activeBookings: active, totalSpent: total });
-      }
-
-      // Fetch DL Status
-      const dlResponse = await fetch(`${API_BASE_URL}/dl/status`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-      const dlData = await dlResponse.json();
-      if (dlResponse.ok) {
-        setStats(prev => ({ ...prev, dlVerified: dlData.status === 'verified' }));
       }
     } catch (err) {
       console.error('Error fetching stats:', err);
@@ -64,22 +53,6 @@ const Dashboard = () => {
             <p style={styles.statLabel}>Total Spent</p>
           </div>
         </div>
-
-        <div
-          style={{ ...styles.statCard, cursor: 'pointer', border: stats.dlVerified ? '1px solid #10b981' : '1px solid #f59e0b' }}
-          onClick={() => navigate('/dl-upload')}
-        >
-          <div style={{ ...styles.statIcon, color: stats.dlVerified ? '#10b981' : '#f59e0b' }}>
-            {stats.dlVerified ? '✅' : '🆔'}
-          </div>
-          <div style={stats.statInfo}>
-            <h3 style={{ ...styles.statNumber, fontSize: '1.25rem' }}>
-              {stats.dlVerified ? 'Verified' : 'Verify DL'}
-            </h3>
-            <p style={styles.statLabel}>Driving License</p>
-          </div>
-        </div>
-
 
       </div>
 

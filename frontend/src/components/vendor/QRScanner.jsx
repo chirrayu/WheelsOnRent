@@ -113,11 +113,13 @@ const QRScanner = () => {
     };
 
     const handleUpdateStatus = async (bookingId, newStatus) => {
-        const confirmMsg = newStatus === 'active'
-            ? 'Start the ride? The user will pick up the vehicle.'
-            : 'Complete the ride? The vehicle will be returned.';
+        const confirmMessages = {
+            active: 'Approve this booking and start the ride? The user will pick up the vehicle.',
+            completed: 'Complete the ride? The vehicle will be returned.',
+            cancelled: 'Reject this booking? The vehicle will become available again.'
+        };
 
-        if (!window.confirm(confirmMsg)) return;
+        if (!window.confirm(confirmMessages[newStatus] || 'Update status?')) return;
 
         setLoading(true);
         setError('');
@@ -288,6 +290,58 @@ const QRScanner = () => {
                             </div>
                         </div>
 
+                        {/* DL Image Section */}
+                        <div style={s.detailSection}>
+                            <h4 style={s.sectionLabel}>🪪 Driving License</h4>
+                            {bookingDetails.dl_image ? (
+                                <div style={{ textAlign: 'center' }}>
+                                    <img
+                                        src={bookingDetails.dl_image.startsWith('http') ? bookingDetails.dl_image : `${API_BASE_URL}${bookingDetails.dl_image}`}
+                                        alt="User Driving License"
+                                        style={{
+                                            maxWidth: '100%',
+                                            maxHeight: '300px',
+                                            borderRadius: '8px',
+                                            border: '2px solid #e2e8f0',
+                                            objectFit: 'contain',
+                                            cursor: 'pointer'
+                                        }}
+                                        onClick={(e) => {
+                                            window.open(e.target.src, '_blank');
+                                        }}
+                                    />
+                                    <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: '8px 0 0 0' }}>
+                                        Click image to view full size
+                                    </p>
+                                </div>
+                            ) : (
+                                <div style={{
+                                    padding: '20px',
+                                    backgroundColor: '#fef3c7',
+                                    borderRadius: '8px',
+                                    textAlign: 'center',
+                                    color: '#92400e'
+                                }}>
+                                    ⚠️ No DL image uploaded by user
+                                </div>
+                            )}
+                            {bookingDetails.noc_agreed && (
+                                <div style={{
+                                    marginTop: '12px',
+                                    padding: '10px 16px',
+                                    backgroundColor: '#ecfdf5',
+                                    borderRadius: '8px',
+                                    color: '#059669',
+                                    fontSize: '0.85rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px'
+                                }}>
+                                    ✅ NOC / Terms & Conditions signed by user
+                                </div>
+                            )}
+                        </div>
+
                         {/* Vehicle Info */}
                         <div style={s.detailSection}>
                             <h4 style={s.sectionLabel}>Vehicle Details</h4>
@@ -336,13 +390,22 @@ const QRScanner = () => {
                         <h4 style={{ margin: '0 0 16px 0', color: '#1e293b' }}>Actions</h4>
                         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                             {bookingDetails.status === 'confirmed' && (
-                                <button
-                                    onClick={() => handleUpdateStatus(bookingDetails.booking_id, 'active')}
-                                    style={s.startBtn}
-                                    disabled={loading}
-                                >
-                                    🚀 {loading ? 'Starting...' : 'Start Ride'}
-                                </button>
+                                <>
+                                    <button
+                                        onClick={() => handleUpdateStatus(bookingDetails.booking_id, 'active')}
+                                        style={s.startBtn}
+                                        disabled={loading}
+                                    >
+                                        ✅ {loading ? 'Approving...' : 'Approve & Start Ride'}
+                                    </button>
+                                    <button
+                                        onClick={() => handleUpdateStatus(bookingDetails.booking_id, 'cancelled')}
+                                        style={s.dangerBtn}
+                                        disabled={loading}
+                                    >
+                                        ❌ {loading ? 'Rejecting...' : 'Reject Booking'}
+                                    </button>
+                                </>
                             )}
                             {bookingDetails.status === 'active' && (
                                 <button
@@ -362,7 +425,7 @@ const QRScanner = () => {
                             {bookingDetails.status === 'cancelled' && (
                                 <div style={{ padding: '16px', backgroundColor: '#fee2e2', borderRadius: '8px', flex: 1, textAlign: 'center' }}>
                                     <span style={{ fontSize: '1.5rem' }}>❌</span>
-                                    <p style={{ margin: '8px 0 0 0', color: '#dc2626', fontWeight: '600' }}>Booking cancelled</p>
+                                    <p style={{ margin: '8px 0 0 0', color: '#dc2626', fontWeight: '600' }}>Booking rejected</p>
                                 </div>
                             )}
                             <button onClick={resetScanner} style={s.secondaryBtn}>

@@ -150,15 +150,14 @@ def verify_qr(vendor_id):
             
         user_name = user.get('name', 'Unknown')
         user_phone = user.get('phone', 'N/A')
-        dl_verified = user.get('dl_verified', False)
-
-        # 1. Check if DL is verified
-        if not dl_verified:
-            return jsonify({
-                'valid': False,
-                'error': 'User DL not verified. Please ask user to verify DL.',
-                'user_name': user_name
-            }), 200 # Using 200 for scanning results but with valid=False
+        
+        # Determine DL image: check booking first, then profile fallback
+        dl_image = booking.get('dl_image')
+        if not dl_image:
+            dl_profile = db.dl_uploads.find_one({'user_id': str(user['_id'])})
+            if dl_profile:
+                dl_image = dl_profile.get('image_url') or dl_profile.get('image_filename')
+                print(f"DEBUG: Found profile fallback DL for user {user['_id']}: {dl_image}")
 
         # 2. Check if time is within booking window (buffer of 30 mins)
         try:
@@ -198,7 +197,8 @@ def verify_qr(vendor_id):
                 'license_plate': vehicle.get('license_plate', ''),
                 'user_name': user_name,
                 'user_phone': user_phone,
-                'dl_verified': dl_verified
+                'dl_image': dl_image,
+                'noc_agreed': booking.get('noc_agreed', False)
             }
         }), 200
 
@@ -223,8 +223,8 @@ def update_ride_status(vendor_id):
         if not booking_id or not new_status:
             return jsonify({'error': 'Booking ID and status are required'}), 400
 
-        if new_status not in ['active', 'completed']:
-            return jsonify({'error': 'Status must be "active" or "completed"'}), 400
+        if new_status not in ['active', 'completed', 'cancelled']:
+            return jsonify({'error': 'Status must be "active", "completed", or "cancelled"'}), 400
 
         booking = db.bookings.find_one({'_id': ObjectId(booking_id)})
         if not booking:
@@ -249,7 +249,48 @@ def update_ride_status(vendor_id):
         if new_status == 'active':
             update_fields['ride_started_at'] = datetime.utcnow()
         elif new_status == 'completed':
-            update_fields['ride_completed_at'] = datetime.utcnow()
+            ride_completed_at = datetime.utcnow()
+            update_fields['ride_completed_at'] = ride_completed_at
+            
+            # Calculate final amount
+            ride_started_at = booking.get('ride_started_at')
+            if ride_started_at:
+                duration = ride_completed_at - ride_started_at
+                seconds = duration.total_seconds()
+                hours = seconds / 3600
+                rate = booking.get('rate', 0)
+                booking_type = booking.get('booking_type', 'daily')
+                
+                if booking_type == 'hourly':
+                    # Minimum 1 hour
+                    billable_hours = max(1, int(hours) + (1 if seconds % 3600 > 0 else 0))
+                    final_amount = billable_hours * rate
+                    duration_text = f"{billable_hours} hour(s)"
+                else:
+                    # Daily rate: Minimum 1 day
+                    days = hours / 24
+                    billable_days = max(1, int(days) + (1 if hours % 24 > 0 else 0))
+                    final_amount = billable_days * rate
+                    duration_text = f"{billable_days} day(s)"
+                
+                update_fields['final_amount'] = final_amount
+                update_fields['total_duration'] = duration_text
+            else:
+                final_amount = booking.get('rate', 0) # Fallback
+                duration_text = "N/A"
+                
+            # Make vehicle available again
+            db.vehicles.update_one(
+                {'_id': ObjectId(booking['vehicle_id'])},
+                {'$set': {'is_available': True}}
+            )
+            db.vehicle_available.update_one(
+                {'vehicle_id': booking['vehicle_id']},
+                {'$set': {'is_available': True}}
+            )
+        elif new_status == 'cancelled':
+            update_fields['cancelled_at'] = datetime.utcnow()
+            update_fields['cancelled_by'] = 'vendor'
             # Make vehicle available again
             db.vehicles.update_one(
                 {'_id': ObjectId(booking['vehicle_id'])},
@@ -265,8 +306,22 @@ def update_ride_status(vendor_id):
             {'$set': update_fields}
         )
 
-        status_msg = 'Ride started!' if new_status == 'active' else 'Ride completed!'
-        return jsonify({'message': status_msg, 'status': new_status}), 200
+        status_messages = {
+            'active': 'Ride started!',
+            'completed': 'Ride completed!',
+            'cancelled': 'Booking rejected by vendor.'
+        }
+        
+        response_data = {
+            'message': status_messages.get(new_status, 'Updated'),
+            'status': new_status
+        }
+        
+        if new_status == 'completed':
+            response_data['final_amount'] = update_fields.get('final_amount', 0)
+            response_data['total_duration'] = update_fields.get('total_duration', 'N/A')
+            
+        return jsonify(response_data), 200
 
     except Exception as e:
         print(f"Update ride status error: {str(e)}")
