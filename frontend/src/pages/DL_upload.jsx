@@ -5,18 +5,15 @@ import './DL_upload.css';
 
 const DLUpload = () => {
   const [formData, setFormData] = useState({
-    dlNumber: '',
-    idNumber: ''
+    dlNumber: ''
   });
 
   const [files, setFiles] = useState({
-    dlFile: null,
-    idFile: null
+    dlFile: null
   });
 
   const [uploadProgress, setUploadProgress] = useState({
-    dl: 0,
-    id: 0
+    dl: 0
   });
 
   const [error, setError] = useState('');
@@ -72,9 +69,7 @@ const DLUpload = () => {
         ...files,
         [fileType]: file
       });
-
-      // Simulate upload progress
-      simulateUpload(fileType === 'dlFile' ? 'dl' : 'id');
+      simulateUpload('dl');
     }
   };
 
@@ -99,8 +94,7 @@ const DLUpload = () => {
       [fileType]: null
     });
     setUploadProgress({
-      ...uploadProgress,
-      [fileType === 'dlFile' ? 'dl' : 'id']: 0
+      dl: 0
     });
   };
 
@@ -206,17 +200,6 @@ const DLUpload = () => {
             />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="idNumber">ID Card Number:</label>
-            <input
-              type="text"
-              id="idNumber"
-              name="idNumber"
-              className="form-control"
-              value={formData.idNumber}
-              onChange={handleChange}
-            />
-          </div>
 
           <div className="form-group">
             <label>Upload Driving License Document:</label>
@@ -253,40 +236,6 @@ const DLUpload = () => {
             )}
           </div>
 
-          <div className="form-group">
-            <label>Upload ID Card Document:</label>
-            <div className="file-input-wrapper">
-              <label className="file-input-label">
-                {files.idFile ? files.idFile.name : 'Choose ID Card File'}
-                <span>Supports JPG, PNG (Max 5MB)</span>
-                <input
-                  type="file"
-                  className="file-input"
-                  accept="image/*"
-                  onChange={(e) => handleFileChange('idFile', e)}
-                />
-              </label>
-            </div>
-            {uploadProgress.id > 0 && (
-              <div className="progress-bar">
-                Upload Progress: {uploadProgress.id}%
-              </div>
-            )}
-            {files.idFile && (
-              <div className="uploaded-files">
-                <div className="uploaded-file">
-                  <span>{files.idFile.name}</span>
-                  <button
-                    type="button"
-                    className="remove-file"
-                    onClick={() => removeFile('idFile')}
-                  >
-                    Remove
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
 
           <button
             type="submit"

@@ -4,7 +4,6 @@ import Login from './pages/Login';
 import Registration from './pages/Registration';
 // Removed AdminPanel import
 import UserPortal from './pages/UserPortal';
-import DLUpload from './pages/DL_upload';
 import MyTeamPanel from './pages/MyTeamPanel';
 import PasswordReset from './pages/PasswordReset';
 import AddVendor from './pages/AddVendor';
@@ -40,26 +39,26 @@ export const useAuth = () => {
 // Protected Route Component
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   const { user } = useAuth();
-  
+
   if (!user) {
     return <Navigate to="/login" replace />;
   }
-  
+
   if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
     return <Navigate to="/login" replace />;
   }
-  
+
   return children;
 };
 
 // Vendor Protected Route Component
 const VendorProtectedRoute = ({ children }) => {
   const { user } = useAuth();
-  
+
   if (!user || user.role !== 'vendor') {
     return <Navigate to="/login" replace />;
   }
-  
+
   return children;
 };
 
@@ -71,11 +70,6 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Registration />} />
         <Route path="/reset-password" element={<PasswordReset />} />
-        <Route path="/dl-upload" element={
-          <ProtectedRoute>
-            <DLUpload />
-          </ProtectedRoute>
-        } />
         {/* Removed AdminPanel route */}
         <Route path="/user-portal/*" element={
           <ProtectedRoute allowedRoles={['user', 'admin']}>

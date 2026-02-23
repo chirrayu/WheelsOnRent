@@ -42,7 +42,7 @@ def team_login():
         # Generate JWT token
         token = jwt.encode({
             'team_id': str(team_member['_id']),
-            'email': team_member['email'],
+            'phone': team_member['phone'],
             'role': team_member.get('role', 'team'),
             'exp': datetime.utcnow() + timedelta(hours=24)
         }, Config.SECRET_KEY, algorithm='HS256')
@@ -52,10 +52,10 @@ def team_login():
             'token': token,
             'user': {
                 'id': str(team_member['_id']),
-                'email': team_member['email'],
+                'phone': team_member['phone'],
                 'name': team_member['name'],
                 'role': team_member.get('role', 'team'),
-                'phone': team_member.get('phone', '')
+                'email': team_member.get('email', '')
             }
         }), 200
 

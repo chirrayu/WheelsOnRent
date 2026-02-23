@@ -1,10 +1,14 @@
-from database import get_db
-from flask import request, jsonify
+import os
 from datetime import datetime
+from flask import request, jsonify
+from database import get_db
 from bson import ObjectId
+from storage import upload_to_s3
 from qr import generate_booking_qr
 from email_service import ride_confirm_qr
 import traceback
+
+# S3-Only storage is enforced.
 
 def get_user_bookings(user_id):
     """
@@ -43,28 +47,43 @@ def create_booking(user_id):
     """
     try:
         db = get_db()
-        data = request.get_json()
         
-        vehicle_id = data.get('vehicle_id')
-        start_date = data.get('start_date')
-        end_date = data.get('end_date')
-        booking_type = data.get('booking_type', 'daily')  # daily or hourly
+        # Support both JSON and FormData
+        if request.content_type and 'multipart/form-data' in request.content_type:
+            vehicle_id = request.form.get('vehicle_id')
+            start_date = request.form.get('start_date')
+            end_date = request.form.get('end_date')
+            booking_type = request.form.get('booking_type', 'daily')
+        else:
+            data = request.get_json()
+            vehicle_id = data.get('vehicle_id')
+            start_date = data.get('start_date')
+            end_date = data.get('end_date')
+            booking_type = data.get('booking_type', 'daily')
         
         if not vehicle_id or not start_date:
+            print(f"DEBUG: Missing fields. vehicle_id: {vehicle_id}, start_date: {start_date}")
             return jsonify({'error': 'Vehicle ID and start date are required'}), 400
+        
+        print(f"DEBUG: Creating booking for vehicle_id: {vehicle_id}, user_id: {user_id}")
+        
+        # Check if user already has an active or confirmed booking
+        existing_booking = db.bookings.find_one({
+            'user_id': user_id,
+            'status': {'$in': ['confirmed', 'active']}
+        })
+        
+        if existing_booking:
+            return jsonify({
+                'error': 'You already have an active or confirmed booking. Please complete or cancel it before booking a new ride.'
+            }), 400
         
         # Get user details
         user = db.users.find_one({'_id': ObjectId(user_id)})
         if not user:
             return jsonify({'error': 'User profile not found'}), 404
         
-        # Check if DL is verified - Only verified users can book
-        if not user.get('dl_verified', False):
-            return jsonify({
-                'error': 'Driving License not verified',
-                'needs_verification': True,
-                'message': 'Only verified users can book vehicles. Please upload and verify your DL in your profile.'
-            }), 403
+        # DL verification removed - DL is submitted during booking
             
         if not user.get('email'):
             print(f"User email not found for ID: {user_id}")
@@ -79,7 +98,17 @@ def create_booking(user_id):
         
         # Calculate cost
         rate = vehicle.get('daily_rate', 0) if booking_type == 'daily' else vehicle.get('hourly_rate', 0)
+        print(f"DEBUG: Calculated rate: {rate} for type: {booking_type}")
         
+        # Save DL file if provided
+        dl_image_path = None
+        if 'dl_file' in request.files:
+            dl_file = request.files['dl_file']
+            if dl_file.filename:
+                print(f"DEBUG: Processing DL file: {dl_file.filename}")
+                dl_image_path = upload_to_s3(dl_file)
+                print(f"DEBUG: DL uploaded to {dl_image_path}")
+
         # Create booking document
         new_booking = {
             'user_id': user_id,
@@ -89,12 +118,15 @@ def create_booking(user_id):
             'end_date': end_date,
             'booking_type': booking_type,
             'rate': rate,
-            'status': 'confirmed',  # confirmed, active, completed, cancelled
+            'status': 'confirmed',
+            'dl_image': dl_image_path,
+            'noc_agreed': True,
             'created_at': datetime.utcnow()
         }
         
         result = db.bookings.insert_one(new_booking)
         booking_id = str(result.inserted_id)
+        print(f"DEBUG: Booking inserted. ID: {booking_id}")
         
         # Mark vehicle as unavailable
         db.vehicles.update_one(
@@ -141,9 +173,13 @@ def create_booking(user_id):
         }), 201
 
     except Exception as e:
+        error_tb = traceback.format_exc()
         print(f"Create booking error: {str(e)}")
-        print(traceback.format_exc())
-        return jsonify({'error': f'Creating booking failed: {str(e)}'}), 500
+        print(error_tb)
+        return jsonify({
+            'error': f'Booking creation failed: {str(e)}',
+            'traceback': error_tb
+        }), 500
 
 def cancel_booking(user_id):
     """
@@ -166,8 +202,14 @@ def cancel_booking(user_id):
         if not booking:
             return jsonify({'error': 'Booking not found'}), 404
         
-        if booking.get('status') == 'cancelled':
+        current_status = booking.get('status')
+        if current_status == 'cancelled':
             return jsonify({'error': 'Booking is already cancelled'}), 400
+            
+        if current_status != 'confirmed':
+            return jsonify({
+                'error': f'Cannot cancel a ride that is already {current_status}. Please contact the vendor.'
+            }), 400
         
         # Update booking status
         db.bookings.update_one(

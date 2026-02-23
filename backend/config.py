@@ -12,10 +12,13 @@ class Config:
     # Email Service
     RESEND_APIKEY = os.environ.get("RESEND_APIKEY")
     
-    # Image Management
-    IMAGEKIT_PUBLIC_KEY = os.environ.get("IMAGEKIT_PUBLIC_KEY")
-    IMAGEKIT_PRIVATE_KEY = os.environ.get("IMAGEKIT_PRIVATE_KEY")
-    IMAGEKIT_URL_ENDPOINT = os.environ.get("IMAGEKIT_URL_ENDPOINT")
+    # Storage Management (S3)
+    S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME")
+
+    # AWS SNS Configuration
+    AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
+    AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 
     @staticmethod
     def validate():
@@ -23,8 +26,8 @@ class Config:
             raise Exception("MONGO_URI not set")
         if not Config.RESEND_APIKEY:
             print("WARNING: RESEND_APIKEY not set. Email services will fail.")
-        if not all([Config.IMAGEKIT_PUBLIC_KEY, Config.IMAGEKIT_PRIVATE_KEY, Config.IMAGEKIT_URL_ENDPOINT]):
-             print("WARNING: ImageKit configuration missing. Image uploads will fail.")
+        if not Config.S3_BUCKET_NAME:
+             print("WARNING: S3_BUCKET_NAME configuration missing. Image uploads will fail.")
 
 # Validate configuration on import
 # Backwards compatibility exports
@@ -32,6 +35,9 @@ SECRET_KEY = Config.SECRET_KEY
 MONGO_URI = Config.MONGO_URI
 FRONTEND_URL = Config.FRONTEND_URL
 RESEND_APIKEY = Config.RESEND_APIKEY
-IMAGEKIT_PUBLIC_KEY = Config.IMAGEKIT_PUBLIC_KEY
-IMAGEKIT_PRIVATE_KEY = Config.IMAGEKIT_PRIVATE_KEY
-IMAGEKIT_URL_ENDPOINT = Config.IMAGEKIT_URL_ENDPOINT
+S3_BUCKET_NAME = Config.S3_BUCKET_NAME
+
+# AWS SNS Configuration exports
+AWS_ACCESS_KEY_ID = Config.AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY = Config.AWS_SECRET_ACCESS_KEY
+AWS_REGION = Config.AWS_REGION

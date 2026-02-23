@@ -12,3 +12,4 @@ pillow
 werkzeug
 python-dotenv
 gunicorn
+boto3

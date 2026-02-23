@@ -5,9 +5,9 @@ import API_BASE_URL from '../apiConfig';
 import './Login.css';
 
 const Login = () => {
-  const [credentials, setCredentials] = useState({ email: '', password: '' });
+  const [credentials, setCredentials] = useState({ phone: '', password: '' });
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
+  const [forgotPasswordPhone, setForgotPasswordPhone] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
@@ -22,15 +22,15 @@ const Login = () => {
   };
 
   const handleForgotPasswordChange = (e) => {
-    setForgotPasswordEmail(e.target.value);
+    setForgotPasswordPhone(e.target.value);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     // Simple validation
-    if (!credentials.email || !credentials.password) {
-      setError('Please enter both email and password');
+    if (!credentials.phone || !credentials.password) {
+      setError('Please enter both phone number and password');
       return;
     }
 
@@ -44,7 +44,7 @@ const Login = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          email: credentials.email,
+          phone: credentials.phone,
           password: credentials.password
         })
       });
@@ -60,7 +60,7 @@ const Login = () => {
 
         // Log in the user in the context
         login({
-          email: user.email,
+          phone: user.phone,
           role: user.role,
           name: user.name,
           id: user.id
@@ -90,8 +90,8 @@ const Login = () => {
   const handleForgotPasswordSubmit = async (e) => {
     e.preventDefault();
 
-    if (!forgotPasswordEmail) {
-      setError('Please enter your email address');
+    if (!forgotPasswordPhone) {
+      setError('Please enter your phone number');
       return;
     }
 
@@ -106,15 +106,15 @@ const Login = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          email: forgotPasswordEmail
+          phone: forgotPasswordPhone
         })
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        setSuccess(data.message || 'Password reset link has been sent to your email');
-        setForgotPasswordEmail('');
+        setSuccess(data.message || 'Password reset code has been sent to your phone');
+        setForgotPasswordPhone('');
       } else {
         setError(data.error || 'Failed to send password reset link. Please try again.');
       }
@@ -142,15 +142,15 @@ const Login = () => {
 
           <form className="login-form" onSubmit={handleForgotPasswordSubmit}>
             <div className="form-group">
-              <label htmlFor="forgot-email">Email:</label>
+              <label htmlFor="forgot-phone">Phone Number:</label>
               <input
-                type="email"
-                id="forgot-email"
-                name="forgot-email"
+                type="tel"
+                id="forgot-phone"
+                name="forgot-phone"
                 className="form-control"
-                value={forgotPasswordEmail}
+                value={forgotPasswordPhone}
                 onChange={handleForgotPasswordChange}
-                placeholder="Enter your email address"
+                placeholder="Enter your registered phone number"
                 required
               />
             </div>
@@ -186,14 +186,15 @@ const Login = () => {
 
         <form className="login-form" onSubmit={handleSubmit}>
           <div className="form-group">
-            <label htmlFor="email">Email:</label>
+            <label htmlFor="phone">Phone / ID:</label>
             <input
-              type="email"
-              id="email"
-              name="email"
+              type="text"
+              id="phone"
+              name="phone"
               className="form-control"
-              value={credentials.email}
+              value={credentials.phone}
               onChange={handleChange}
+              placeholder="Enter your phone or ID"
               required
             />
           </div>

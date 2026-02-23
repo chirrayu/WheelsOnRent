@@ -14,6 +14,10 @@ const Vendors = () => {
   const [vendorVehicles, setVendorVehicles] = useState([]);
   const [loadingVehicles, setLoadingVehicles] = useState(false);
 
+  // Error Popup State
+  const [showErrorPopup, setShowErrorPopup] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
   // Form State
   const [bookingData, setBookingData] = useState({
     vehicleId: '',
@@ -113,18 +117,22 @@ const Vendors = () => {
       // Start date is now, end date is TBD (calculated on return)
       const now = new Date().toISOString();
 
+      // Use FormData to send DL file along with booking details
+      const formData = new FormData();
+      formData.append('vehicle_id', assignedVehicle._id);
+      formData.append('start_date', now);
+      formData.append('end_date', '');
+      formData.append('booking_type', bookingData.bookingType);
+      if (bookingData.dlFile) {
+        formData.append('dl_file', bookingData.dlFile);
+      }
+
       const response = await fetch(`${API_BASE_URL}/bookings`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({
-          vehicle_id: assignedVehicle._id, // Use the randomly assigned ID
-          start_date: now,
-          end_date: null, // Open ended
-          booking_type: bookingData.bookingType
-        })
+        body: formData
       });
 
       const data = await response.json();
@@ -132,10 +140,12 @@ const Vendors = () => {
         alert("Booking confirmed! Please visit the vendor to scan QR and start your ride.");
         handleCloseModal();
       } else {
-        alert(data.error || "Failed to create booking.");
+        setErrorMessage(data.error || "Failed to create booking.");
+        setShowErrorPopup(true);
       }
     } catch (err) {
-      alert("Network error occurred.");
+      setErrorMessage("Network error occurred.");
+      setShowErrorPopup(true);
     }
   };
 
@@ -149,12 +159,12 @@ const Vendors = () => {
         const scooters = vendorVehicles.filter(v => isScooter(v.vehicle_type));
         const bikes = vendorVehicles.filter(v => isBike(v.vehicle_type));
 
-        const getPriceRange = (vehicles) => {
+        const getPriceRange = (vehicles, type) => {
           if (vehicles.length === 0) return 'N/A';
-          const rates = vehicles.map(v => v.daily_rate);
-          const min = Math.min(...rates);
+          const rateKey = type === 'daily' ? 'daily_rate' : 'hourly_rate';
+          const rates = vehicles.map(v => v[rateKey] || 0);
           const max = Math.max(...rates);
-          return min === max ? `₹${min}` : `₹${min} - ₹${max}`;
+          return `₹${max}`;
         };
 
         return (
@@ -164,17 +174,17 @@ const Vendors = () => {
               Select whether you want a Scooter or a Bike. You will be assigned a vehicle randomly upon booking.
             </p>
 
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ fontWeight: '600', display: 'block', marginBottom: '8px' }}>Booking Rate Type</label>
-              <div style={{ display: 'flex', gap: '10px' }}>
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{ fontWeight: '600', display: 'block', marginBottom: '12px', fontSize: '1rem', color: '#1e293b' }}>Booking Rate Type</label>
+              <div style={{ display: 'flex', gap: '12px' }}>
                 <button
-                  style={{ ...styles.typeBtn, backgroundColor: bookingData.bookingType === 'daily' ? '#6366f1' : '#f1f5f9', color: bookingData.bookingType === 'daily' ? 'white' : '#64748b' }}
+                  style={{ ...styles.typeBtn, padding: '12px', backgroundColor: bookingData.bookingType === 'daily' ? '#6366f1' : '#f1f5f9', color: bookingData.bookingType === 'daily' ? 'white' : '#64748b' }}
                   onClick={() => setBookingData({ ...bookingData, bookingType: 'daily' })}
                 >
                   Daily Rate
                 </button>
                 <button
-                  style={{ ...styles.typeBtn, backgroundColor: bookingData.bookingType === 'hourly' ? '#6366f1' : '#f1f5f9', color: bookingData.bookingType === 'hourly' ? 'white' : '#64748b' }}
+                  style={{ ...styles.typeBtn, padding: '12px', backgroundColor: bookingData.bookingType === 'hourly' ? '#6366f1' : '#f1f5f9', color: bookingData.bookingType === 'hourly' ? 'white' : '#64748b' }}
                   onClick={() => setBookingData({ ...bookingData, bookingType: 'hourly' })}
                 >
                   Hourly Rate
@@ -182,12 +192,16 @@ const Vendors = () => {
               </div>
             </div>
 
-            {loadingVehicles ? <p>Loading vehicles...</p> : (
-              <div style={styles.modalGrid}>
-                {/* SCOOTER CARD */}
+            {loadingVehicles ? <p>Loading vendors...</p> : (
+              <div style={styles.modalGrid} className="modal-scrollbar-refined">
                 <div
+                  className={bookingData.vehicleType === 'Scooter' ? 'vehicle-card-selected' : ''}
                   style={{
                     ...styles.vehicleOption,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '16px',
+                    padding: '12px 16px',
                     borderColor: bookingData.vehicleType === 'Scooter' ? '#6366f1' : '#e2e8f0',
                     backgroundColor: bookingData.vehicleType === 'Scooter' ? '#eef2ff' : 'white',
                     opacity: scooters.length === 0 ? 0.6 : 1,
@@ -195,18 +209,29 @@ const Vendors = () => {
                   }}
                   onClick={() => scooters.length > 0 && setBookingData({ ...bookingData, vehicleType: 'Scooter' })}
                 >
-                  <div style={{ fontSize: '2rem', marginBottom: '10px' }}>🛵</div>
-                  <h4>Scooter</h4>
-                  <p style={{ color: '#666', fontSize: '0.9rem' }}>Available: {scooters.length}</p>
-                  <p style={{ fontWeight: 'bold', color: '#6366f1', marginTop: '5px' }}>
-                    {bookingData.bookingType === 'daily' ? `${getPriceRange(scooters)}/day` : 'Hourly rates available'}
-                  </p>
+                  <div style={{ fontSize: '2.5rem' }}>🛵</div>
+                  <div style={{ flex: 1 }}>
+                    <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700', color: '#1e293b' }}>Scooter</h4>
+                    <p style={{ margin: '2px 0 0 0', color: '#64748b', fontSize: '0.875rem' }}>Available: {scooters.length}</p>
+                    <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <div style={{ fontSize: '0.9rem', fontWeight: bookingData.bookingType === 'hourly' ? '600' : '400', color: bookingData.bookingType === 'hourly' ? '#6366f1' : '#94a3b8' }}>
+                        {getPriceRange(scooters, 'hourly')} / hr
+                      </div>
+                      <div style={{ fontSize: '0.9rem', fontWeight: bookingData.bookingType === 'daily' ? '600' : '400', color: bookingData.bookingType === 'daily' ? '#6366f1' : '#94a3b8' }}>
+                        {getPriceRange(scooters, 'daily')} / day
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                {/* BIKE CARD */}
                 <div
+                  className={bookingData.vehicleType === 'Bike' ? 'vehicle-card-selected' : ''}
                   style={{
                     ...styles.vehicleOption,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '16px',
+                    padding: '12px 16px',
                     borderColor: bookingData.vehicleType === 'Bike' ? '#6366f1' : '#e2e8f0',
                     backgroundColor: bookingData.vehicleType === 'Bike' ? '#eef2ff' : 'white',
                     opacity: bikes.length === 0 ? 0.6 : 1,
@@ -214,17 +239,24 @@ const Vendors = () => {
                   }}
                   onClick={() => bikes.length > 0 && setBookingData({ ...bookingData, vehicleType: 'Bike' })}
                 >
-                  <div style={{ fontSize: '2rem', marginBottom: '10px' }}>🏍️</div>
-                  <h4>Bike</h4>
-                  <p style={{ color: '#666', fontSize: '0.9rem' }}>Available: {bikes.length}</p>
-                  <p style={{ fontWeight: 'bold', color: '#6366f1', marginTop: '5px' }}>
-                    {bookingData.bookingType === 'daily' ? `${getPriceRange(bikes)}/day` : 'Hourly rates available'}
-                  </p>
+                  <div style={{ fontSize: '2.5rem' }}>🏍️</div>
+                  <div style={{ flex: 1 }}>
+                    <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700', color: '#1e293b' }}>Bike</h4>
+                    <p style={{ margin: '2px 0 0 0', color: '#64748b', fontSize: '0.875rem' }}>Available: {bikes.length}</p>
+                    <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <div style={{ fontSize: '0.9rem', fontWeight: bookingData.bookingType === 'hourly' ? '600' : '400', color: bookingData.bookingType === 'hourly' ? '#6366f1' : '#94a3b8' }}>
+                        {getPriceRange(bikes, 'hourly')} / hr
+                      </div>
+                      <div style={{ fontSize: '0.9rem', fontWeight: bookingData.bookingType === 'daily' ? '600' : '400', color: bookingData.bookingType === 'daily' ? '#6366f1' : '#94a3b8' }}>
+                        {getPriceRange(bikes, 'daily')} / day
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
-            <div style={styles.modalActions}>
-              <button disabled={!bookingData.vehicleType} onClick={() => setStep(2)} style={styles.nextBtn}>Next</button>
+            <div style={{ ...styles.modalActions, justifyContent: 'flex-start' }}>
+              <button disabled={!bookingData.vehicleType} onClick={() => setStep(2)} style={{ ...styles.nextBtn, width: '120px' }}>Next</button>
             </div>
           </div>
         );
@@ -276,6 +308,28 @@ const Vendors = () => {
     }
   };
 
+  const renderErrorPopup = () => {
+    if (!showErrorPopup) return null;
+
+    return (
+      <div style={styles.modalOverlay}>
+        <div style={{ ...styles.modalContent, textAlign: 'center', borderTop: '4px solid #ef4444' }}>
+          <div style={{ fontSize: '3rem', marginBottom: '16px' }}>⚠️</div>
+          <h3 style={{ color: '#1e293b', marginBottom: '12px' }}>Booking Restriction</h3>
+          <p style={{ color: '#64748b', fontSize: '1rem', lineHeight: '1.5', marginBottom: '24px' }}>
+            {errorMessage}
+          </p>
+          <button
+            onClick={() => setShowErrorPopup(false)}
+            style={{ ...styles.confirmBtn, backgroundColor: '#64748b', width: '100%' }}
+          >
+            I Understand
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   if (loading) return <div style={styles.container}><div style={styles.loading}>Loading vendors...</div></div>;
   if (error) return <div style={styles.container}><div style={styles.error}>{error}</div></div>;
 
@@ -305,10 +359,14 @@ const Vendors = () => {
         <div style={styles.modalOverlay}>
           <div style={styles.modalContent}>
             <button onClick={handleCloseModal} style={styles.closeModalBtn}>×</button>
-            {renderModalContent()}
+            <div className="custom-modal-grid-container">
+              {renderModalContent()}
+            </div>
           </div>
         </div>
       )}
+
+      {renderErrorPopup()}
     </div>
   );
 };
@@ -327,16 +385,16 @@ const styles = {
   bookBtn: { width: '100%', padding: '10px', backgroundColor: '#6366f1', color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' },
 
   // Modal Styles
-  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 },
-  modalContent: { backgroundColor: 'white', padding: '30px', borderRadius: '12px', width: '90%', maxWidth: '500px', position: 'relative', maxHeight: '90vh', overflowY: 'auto' },
+  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, backdropFilter: 'blur(2px)' },
+  modalContent: { backgroundColor: 'white', padding: '32px', borderRadius: '16px', width: '90%', maxWidth: '550px', position: 'relative', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' },
   closeModalBtn: { position: 'absolute', top: '10px', right: '15px', background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#666' },
-  stepContainer: { display: 'flex', flexDirection: 'column', gap: '20px' },
-  modalGrid: { display: 'grid', gridTemplateColumns: '1fr', gap: '10px', maxHeight: '300px', overflowY: 'auto' },
-  vehicleOption: { padding: '15px', border: '2px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s' },
+  stepContainer: { display: 'flex', flexDirection: 'column', gap: '24px' },
+  modalGrid: { display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '350px', overflowY: 'auto', paddingRight: '8px' },
+  vehicleOption: { padding: '16px', border: '1px solid #e2e8f0', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)' },
   formGroup: { display: 'flex', flexDirection: 'column', gap: '8px' },
   input: { padding: '10px', borderRadius: '6px', border: '1px solid #ccc' },
   modalActions: { display: 'flex', justifyContent: 'space-between', marginTop: '20px' },
-  nextBtn: { padding: '10px 20px', backgroundColor: '#6366f1', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' },
+  nextBtn: { padding: '12px 24px', backgroundColor: '#6366f1', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '1rem', transition: 'background-color 0.2s' },
   backBtn: { padding: '10px 20px', backgroundColor: '#94a3b8', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' },
   confirmBtn: { padding: '10px 20px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' },
   nocBox: { backgroundColor: '#f9f9f9', padding: '15px', borderRadius: '8px', border: '1px solid #eee', fontSize: '0.9rem', lineHeight: '1.5' },
