@@ -1,12 +1,14 @@
 from database import get_db
-from flask import request, jsonify
+from flask import request, jsonify, make_response
 import jwt
 import bcrypt
-from datetime import datetime, timedelta
+import random
+from datetime import datetime, timedelta, timezone
 from bson import ObjectId
 import traceback
-from email_service import password_reset
+from email_service import password_reset, otp_sending_function
 from config import Config
+from security_logger import log_security_event
 
 def login_user():
     """
@@ -22,25 +24,52 @@ def login_user():
             return jsonify({'error': 'Credentials and password are required'}), 400
 
         # First, try to find user in users collection (Strictly by phone)
-        user = db.users.find_one({'phone': identifier})
+        user = db.users.find_one({'phone': str(identifier)})
         if user:
-            # ... existing login logic ...
+            # ACCOUNT-LEVEL THROTTLING
+            if user.get('login_attempts', 0) >= 5:
+                # Check if last attempt was within 15 minutes
+                last_attempt = user.get('last_attempt_time')
+                if last_attempt and (datetime.now(timezone.utc) - last_attempt.replace(tzinfo=timezone.utc)).total_seconds() < 900:
+                    log_security_event('ACCOUNT_LOCKED', {'identifier': identifier, 'type': 'user'}, severity='WARNING')
+                    return jsonify({'error': 'Too many failed login attempts. Account locked for 15 minutes.'}), 429
+                else:
+                    # Reset after 15 mins
+                    db.users.update_one({'_id': user['_id']}, {'$set': {'login_attempts': 0}})
+
             if not bcrypt.checkpw(password.encode('utf-8'), user['password'].encode('utf-8')):
+                db.users.update_one(
+                    {'_id': user['_id']}, 
+                    {'$inc': {'login_attempts': 1}, '$set': {'last_attempt_time': datetime.now(timezone.utc)}}
+                )
+                log_security_event('LOGIN_FAIL', {'identifier': identifier, 'type': 'user'}, severity='INFO')
                 return jsonify({'error': 'Invalid credentials'}), 401
 
-            # Check if user is verified (optional check now)
-            if not user.get('is_verified', True):
-                pass
+            # Successful login: Reset attempts and update token version if missing
+            db.users.update_one(
+                {'_id': user['_id']}, 
+                {'$set': {'login_attempts': 0, 'last_login': datetime.now(timezone.utc)}}
+            )
+            
+            # Use existing token_version or initialize it
+            token_version = user.get('token_version', 0)
 
-            # Generate JWT token
+            # Check if user is verified
+            if not user.get('is_verified', False):
+                return jsonify({'error': 'Account not verified. Please complete OTP verification.'}), 403
+
+            # Generate JWT token with token_version
             token = jwt.encode({
                 'user_id': str(user['_id']),
                 'phone': user['phone'],
                 'role': user.get('role', 'user'),
-                'exp': datetime.utcnow() + timedelta(hours=24)
+                'token_version': token_version,
+                'exp': datetime.now(timezone.utc) + timedelta(hours=24)
             }, Config.SECRET_KEY, algorithm='HS256')
 
-            return jsonify({
+            log_security_event('LOGIN_SUCCESS', {'user_id': str(user['_id']), 'role': 'user'}, severity='INFO')
+
+            response = make_response(jsonify({
                 'message': 'Login successful',
                 'token': token,
                 'user': {
@@ -49,34 +78,53 @@ def login_user():
                     'name': user['name'],
                     'role': user.get('role', 'user')
                 }
-            }), 200
+            }), 200)
+            response.set_cookie(
+                'access_token', token,
+                httponly=True,
+                secure=Config.ENV == 'production',
+                samesite='Lax',
+                max_age=86400  # 24 hours
+            )
+            return response
 
         # Next, try to find team member in teams collection (Strictly by email)
-        team_member = db.teams.find_one({'email': identifier})
+        team_member = db.teams.find_one({'email': str(identifier)})
         if team_member:
-            # Verify password
+            # ACCOUNT-LEVEL THROTTLING
+            if team_member.get('login_attempts', 0) >= 5:
+                last_attempt = team_member.get('last_attempt_time')
+                if last_attempt and (datetime.now(timezone.utc) - last_attempt.replace(tzinfo=timezone.utc)).total_seconds() < 900:
+                    log_security_event('ACCOUNT_LOCKED', {'identifier': identifier, 'type': 'team'}, severity='WARNING')
+                    return jsonify({'error': 'Too many failed login attempts. Account locked for 15 minutes.'}), 429
+
             if not bcrypt.checkpw(password.encode('utf-8'), team_member['password'].encode('utf-8')):
+                db.teams.update_one(
+                    {'_id': team_member['_id']}, 
+                    {'$inc': {'login_attempts': 1}, '$set': {'last_attempt_time': datetime.now(timezone.utc)}}
+                )
+                log_security_event('LOGIN_FAIL', {'identifier': identifier, 'type': 'team'}, severity='INFO')
                 return jsonify({'error': 'Invalid credentials'}), 401
-
-            # Check if team member is active
-            if not team_member.get('is_active', True):
-                return jsonify({'error': 'Team member account is deactivated'}), 401
-
-            # Update last login time
+            
+            # Successful login
+            token_version = team_member.get('token_version', 0)
             db.teams.update_one(
-                {'_id': team_member['_id']},
-                {'$set': {'last_login': datetime.utcnow()}}
+                {'_id': team_member['_id']}, 
+                {'$set': {'login_attempts': 0, 'last_login': datetime.now(timezone.utc)}}
             )
 
-            # Generate JWT token
+            # Generate JWT token with token_version
             token = jwt.encode({
                 'team_id': str(team_member['_id']),
                 'phone': team_member['phone'],
                 'role': team_member.get('role', 'team'),
-                'exp': datetime.utcnow() + timedelta(hours=24)
+                'token_version': token_version,
+                'exp': datetime.now(timezone.utc) + timedelta(hours=24)
             }, Config.SECRET_KEY, algorithm='HS256')
 
-            return jsonify({
+            log_security_event('LOGIN_SUCCESS', {'team_id': str(team_member['_id']), 'role': 'team'}, severity='INFO')
+
+            response = make_response(jsonify({
                 'message': 'Team login successful',
                 'token': token,
                 'user': {
@@ -86,34 +134,52 @@ def login_user():
                     'role': team_member.get('role', 'team'),
                     'email': team_member.get('email', '')
                 }
-            }), 200
+            }), 200)
+            response.set_cookie(
+                'access_token', token,
+                httponly=True,
+                secure=Config.ENV == 'production',
+                samesite='Lax',
+                max_age=86400
+            )
+            return response
 
         # Finally, try vendors collection (Strictly by email)
-        vendor = db.vendors.find_one({'email': identifier})
+        vendor = db.vendors.find_one({'email': str(identifier)})
         if vendor:
-            # Verify password
+            # ACCOUNT-LEVEL THROTTLING
+            if vendor.get('login_attempts', 0) >= 5:
+                last_attempt = vendor.get('last_attempt_time')
+                if last_attempt and (datetime.now(timezone.utc) - last_attempt.replace(tzinfo=timezone.utc)).total_seconds() < 900:
+                    log_security_event('ACCOUNT_LOCKED', {'identifier': identifier, 'type': 'vendor'}, severity='WARNING')
+                    return jsonify({'error': 'Too many failed login attempts. Account locked for 15 minutes.'}), 429
+
             if not bcrypt.checkpw(password.encode('utf-8'), vendor['password'].encode('utf-8')):
+                db.vendors.update_one(
+                    {'_id': vendor['_id']}, 
+                    {'$inc': {'login_attempts': 1}, '$set': {'last_attempt_time': datetime.now(timezone.utc)}}
+                )
+                log_security_event('LOGIN_FAIL', {'identifier': identifier, 'type': 'vendor'}, severity='INFO')
                 return jsonify({'error': 'Invalid credentials'}), 401
 
-            # Check if vendor is active
-            if not vendor.get('is_active', True):
-                return jsonify({'error': 'Vendor account is deactivated'}), 401
-
-            # Update last login time
+            # Successful login
+            token_version = vendor.get('token_version', 0)
             db.vendors.update_one(
-                {'_id': vendor['_id']},
-                {'$set': {'last_login': datetime.utcnow()}}
+                {'_id': vendor['_id']}, 
+                {'$set': {'login_attempts': 0, 'last_login': datetime.now(timezone.utc)}}
             )
+            log_security_event('LOGIN_SUCCESS', {'vendor_id': str(vendor['_id']), 'role': 'vendor'}, severity='INFO')
 
-            # Generate JWT token
+            # Generate JWT token with token_version
             token = jwt.encode({
                 'vendor_id': str(vendor['_id']),
                 'phone': vendor['phone'],
                 'role': vendor.get('role', 'vendor'),
-                'exp': datetime.utcnow() + timedelta(hours=24)
+                'token_version': token_version,
+                'exp': datetime.now(timezone.utc) + timedelta(hours=24)
             }, Config.SECRET_KEY, algorithm='HS256')
 
-            return jsonify({
+            response = make_response(jsonify({
                 'message': 'Login successful',
                 'token': token,
                 'user': {
@@ -123,7 +189,15 @@ def login_user():
                     'role': vendor.get('role', 'vendor'),
                     'email': vendor.get('email', '')
                 }
-            }), 200
+            }), 200)
+            response.set_cookie(
+                'access_token', token,
+                httponly=True,
+                secure=Config.ENV == 'production',
+                samesite='Lax',
+                max_age=86400
+            )
+            return response
 
         # If not found in any collection
         return jsonify({'error': 'Invalid credentials'}), 401
@@ -131,7 +205,7 @@ def login_user():
     except Exception as e:
         print(f"Login error: {str(e)}")
         print(traceback.format_exc())
-        return jsonify({'error': f'Login failed: {str(e)}'}), 500
+        return jsonify({'error': 'Login failed. Please try again.'}), 500
 
 
 def get_profile(current_user_id):
@@ -141,8 +215,11 @@ def get_profile(current_user_id):
     try:
         db = get_db()
         
+        # Optimization: Projection to exclude sensitive/unused fields
+        projection = {'password': 0, 'login_attempts': 0, 'last_attempt_time': 0, 'token_version': 0}
+        
         # Try to find in users collection first
-        user = db.users.find_one({'_id': ObjectId(current_user_id)})
+        user = db.users.find_one({'_id': ObjectId(current_user_id)}, projection)
         if user:
             return jsonify({
                 'user': {
@@ -156,7 +233,7 @@ def get_profile(current_user_id):
             }), 200
 
         # Try to find in teams collection
-        team_member = db.teams.find_one({'_id': ObjectId(current_user_id)})
+        team_member = db.teams.find_one({'_id': ObjectId(current_user_id)}, projection)
         if team_member:
             return jsonify({
                 'user': {
@@ -171,7 +248,7 @@ def get_profile(current_user_id):
             }), 200
 
         # Try to find in vendors collection
-        vendor = db.vendors.find_one({'_id': ObjectId(current_user_id)})
+        vendor = db.vendors.find_one({'_id': ObjectId(current_user_id)}, projection)
         if vendor:
             return jsonify({
                 'user': {
@@ -191,7 +268,7 @@ def get_profile(current_user_id):
     except Exception as e:
         print(f"Profile retrieval error: {str(e)}")
         print(traceback.format_exc())
-        return jsonify({'error': f'Profile retrieval failed: {str(e)}'}), 500
+        return jsonify({'error': 'Profile retrieval failed. Please try again.'}), 500
 
 
 def forgot_password():
@@ -207,76 +284,75 @@ def forgot_password():
             return jsonify({'error': 'Phone number is required'}), 400
 
         # First, try to find in users collection
-        user = db.users.find_one({'phone': phone})
+        user = db.users.find_one({'phone': str(phone)})
         if user:
             # Generate a reset token
             reset_token = jwt.encode({
                 'user_id': str(user['_id']),
                 'phone': user['phone'],
-                'exp': datetime.utcnow() + timedelta(hours=1)  # 1 hour expiry
+                'exp': datetime.now(timezone.utc) + timedelta(hours=1)  # 1 hour expiry
             }, Config.SECRET_KEY, algorithm='HS256')
 
             # Create a localized reset code (simplifying for SMS)
             reset_code = str(random.randint(100000, 999999))
             
             # Store reset code in DB temporarily
-            db.users.update_one({'_id': user['_id']}, {'$set': {'reset_code': reset_code, 'reset_code_expiry': datetime.utcnow() + timedelta(minutes=15)}})
+            db.users.update_one({'_id': user['_id']}, {'$set': {'reset_code': reset_code, 'reset_code_expiry': datetime.now(timezone.utc) + timedelta(minutes=15)}})
 
-            # Send the password reset SMS
-            from sms_service import send_otp_sms
-            sms_success = send_otp_sms(phone, f"Your password reset code is {reset_code}")
-            if not sms_success:
-                return jsonify({'error': 'Failed to send password reset SMS'}), 500
+            # Send the password reset Email instead of SMS
+            email_success = otp_sending_function(user['email'], f"Your password reset code is: {reset_code}")
+            if not email_success:
+                return jsonify({'error': 'Failed to send password reset email'}), 500
 
             return jsonify({
                 'message': 'Password reset code has been sent to your phone'
             }), 200
 
         # Try to find in teams collection
-        team_member = db.teams.find_one({'phone': phone})
+        team_member = db.teams.find_one({'phone': str(phone)})
         if team_member:
             # Generate a reset token
             reset_token = jwt.encode({
                 'team_id': str(team_member['_id']),
                 'phone': team_member['phone'],
-                'exp': datetime.utcnow() + timedelta(hours=1)  # 1 hour expiry
+                'exp': datetime.now(timezone.utc) + timedelta(hours=1)  # 1 hour expiry
             }, Config.SECRET_KEY, algorithm='HS256')
 
             # Create a localized reset code
             reset_code = str(random.randint(100000, 999999))
             
             # Store reset code in DB temporarily
-            db.teams.update_one({'_id': team_member['_id']}, {'$set': {'reset_code': reset_code, 'reset_code_expiry': datetime.utcnow() + timedelta(minutes=15)}})
+            db.teams.update_one({'_id': team_member['_id']}, {'$set': {'reset_code': reset_code, 'reset_code_expiry': datetime.now(timezone.utc) + timedelta(minutes=15)}})
 
-            # Send the password reset SMS
-            sms_success = send_otp_sms(phone, f"Your team account password reset code is {reset_code}")
-            if not sms_success:
-                return jsonify({'error': 'Failed to send password reset SMS'}), 500
+            # Send the password reset Email instead of SMS
+            email_success = otp_sending_function(team_member['email'], f"Your team account password reset code is: {reset_code}")
+            if not email_success:
+                return jsonify({'error': 'Failed to send password reset email'}), 500
 
             return jsonify({
                 'message': 'Password reset code has been sent to your phone'
             }), 200
 
         # Try to find in vendors collection
-        vendor = db.vendors.find_one({'phone': phone})
+        vendor = db.vendors.find_one({'phone': str(phone)})
         if vendor:
             # Generate a reset token
             reset_token = jwt.encode({
                 'vendor_id': str(vendor['_id']),
                 'phone': vendor['phone'],
-                'exp': datetime.utcnow() + timedelta(hours=1)  # 1 hour expiry
+                'exp': datetime.now(timezone.utc) + timedelta(hours=1)  # 1 hour expiry
             }, Config.SECRET_KEY, algorithm='HS256')
 
             # Create a localized reset code
             reset_code = str(random.randint(100000, 999999))
             
             # Store reset code in DB temporarily
-            db.vendors.update_one({'_id': vendor['_id']}, {'$set': {'reset_code': reset_code, 'reset_code_expiry': datetime.utcnow() + timedelta(minutes=15)}})
+            db.vendors.update_one({'_id': vendor['_id']}, {'$set': {'reset_code': reset_code, 'reset_code_expiry': datetime.now(timezone.utc) + timedelta(minutes=15)}})
 
-            # Send the password reset SMS
-            sms_success = send_otp_sms(phone, f"Your vendor account password reset code is {reset_code}")
-            if not sms_success:
-                return jsonify({'error': 'Failed to send password reset SMS'}), 500
+            # Send the password reset Email instead of SMS
+            email_success = otp_sending_function(vendor['email'], f"Your vendor account password reset code is: {reset_code}")
+            if not email_success:
+                return jsonify({'error': 'Failed to send password reset email'}), 500
 
             return jsonify({
                 'message': 'Password reset code has been sent to your phone'
@@ -288,43 +364,41 @@ def forgot_password():
     except Exception as e:
         print(f"Forgot password error: {str(e)}")
         print(traceback.format_exc())
-        return jsonify({'error': f'Password reset request failed: {str(e)}'}), 500
+        return jsonify({'error': 'Password reset request failed. Please try again.'}), 500
 
 
 def reset_password():
     """
-    Handles password reset using reset token.
+    Handles password reset using phone and reset code.
     """
     try:
         db = get_db()
         data = request.get_json()
-        reset_token = data.get('reset_token')
+        phone = data.get('phone')
+        reset_code = data.get('reset_code')
         new_password = data.get('new_password')
 
-        if not reset_token or not new_password:
-            return jsonify({'error': 'Reset token and new password are required'}), 400
-
-        try:
-            # Decode the reset token
-            decoded_token = jwt.decode(reset_token, Config.SECRET_KEY, algorithms=['HS256'])
-            
-            # Determine which collection to use based on token type
-            if 'user_id' in decoded_token:
-                user_id = decoded_token['user_id']
-                collection = db.users
-            elif 'team_id' in decoded_token:
-                user_id = decoded_token['team_id']
-                collection = db.teams
-            elif 'vendor_id' in decoded_token:
-                user_id = decoded_token['vendor_id']
-                collection = db.vendors
-            else:
-                return jsonify({'error': 'Invalid reset token'}), 400
-
-        except jwt.ExpiredSignatureError:
-            return jsonify({'error': 'Reset token has expired'}), 400
-        except jwt.InvalidTokenError:
-            return jsonify({'error': 'Invalid reset token'}), 400
+        if not phone or not reset_code or not new_password:
+            return jsonify({'error': 'Phone, reset code, and new password are required'}), 400
+        
+        # Determine collection by checking where the code exists
+        user_data = None
+        collection = None
+        
+        for coll in [db.users, db.teams, db.vendors]:
+            # Optimization: Only fetch _id and name
+            user_data = coll.find_one({
+                'phone': str(phone),
+                'reset_code': str(reset_code),
+                'reset_code_expiry': {'$gt': datetime.now(timezone.utc)}
+            }, {'_id': 1})
+            if user_data:
+                collection = coll
+                break
+        
+        if not user_data or not collection:
+            log_security_event('PASSWORD_RESET_FAIL', {'identifier': phone, 'reason': 'invalid_code'}, severity='WARNING')
+            return jsonify({'error': 'Invalid or expired reset code'}), 401
 
         # Validate new password
         if len(new_password) < 6:
@@ -333,11 +407,16 @@ def reset_password():
         # Hash the new password
         hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
 
-        # Update user's/team's/vendor's password
+        # Update password and increment token_version
         result = collection.update_one(
-            {'_id': ObjectId(user_id)},
-            {'$set': {'password': hashed_password.decode('utf-8')}}
+            {'_id': user_data['_id']},
+            {
+                '$set': {'password': hashed_password.decode('utf-8'), 'login_attempts': 0},
+                '$inc': {'token_version': 1},
+                '$unset': {'reset_code': '', 'reset_code_expiry': ''}
+            }
         )
+        log_security_event('PASSWORD_RESET_SUCCESS', {'user_id': str(user_data['_id']), 'phone': phone}, severity='INFO')
 
         if result.matched_count == 0:
             return jsonify({'error': 'User not found'}), 404
@@ -347,4 +426,4 @@ def reset_password():
     except Exception as e:
         print(f"Reset password error: {str(e)}")
         print(traceback.format_exc())
-        return jsonify({'error': f'Password reset failed: {str(e)}'}), 500
+        return jsonify({'error': 'Password reset failed. Please try again.'}), 500

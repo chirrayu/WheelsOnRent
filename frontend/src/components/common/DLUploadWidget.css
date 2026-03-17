@@ -1,0 +1,178 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+.dl-upload-container {
+    font-family: 'Inter', sans-serif;
+    width: 100%;
+    max-width: 450px;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 24px;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    color: #fff;
+    transition: all 0.3s ease;
+}
+
+.dl-upload-container:hover {
+    border-color: rgba(66, 133, 244, 0.5);
+    transform: translateY(-2px);
+}
+
+.dl-header {
+    margin-bottom: 20px;
+}
+
+.dl-header h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.dl-header p {
+    margin: 4px 0 0;
+    font-size: 0.85rem;
+    color: #aaa;
+}
+
+.upload-zone {
+    border: 2px dashed rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: 30px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.upload-zone:hover {
+    background: rgba(66, 133, 244, 0.1);
+    border-color: #4285f4;
+}
+
+.upload-icon {
+    font-size: 2.5rem;
+    margin-bottom: 12px;
+    display: block;
+}
+
+.upload-button {
+    background: #4285f4;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 10px;
+}
+
+.digilocker-tip {
+    margin-top: 12px;
+    padding: 8px 12px;
+    background: rgba(66, 133, 244, 0.1);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: #4285f4;
+    border: 1px solid rgba(66, 133, 244, 0.2);
+}
+
+.tip-icon {
+    font-size: 1.1rem;
+}
+
+.status-screen {
+    text-align: center;
+    padding: 20px 0;
+}
+
+/* Spinner Animation */
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(255, 255, 255, 0.1);
+    border-top: 3px solid #4285f4;
+    border-radius: 50%;
+    margin: 0 auto 15px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Progress Bar */
+.progress-container {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    height: 8px;
+    margin: 15px 0;
+    overflow: hidden;
+}
+
+.progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #4285f4, #34a853);
+    transition: width 0.3s ease;
+}
+
+.status-text {
+    font-weight: 500;
+    color: #4285f4;
+}
+
+.success-icon {
+    color: #34a853;
+    font-size: 3rem;
+    margin-bottom: 10px;
+}
+
+.error-icon {
+    color: #ea4335;
+    font-size: 3rem;
+    margin-bottom: 10px;
+}
+
+.extracted-details {
+    background: rgba(52, 168, 83, 0.1);
+    padding: 15px;
+    border-radius: 8px;
+    margin-top: 15px;
+    text-align: left;
+    border-left: 4px solid #34a853;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 5px;
+    font-size: 0.9rem;
+}
+
+.detail-label {
+    color: #aaa;
+}
+
+.detail-value {
+    font-weight: 600;
+}
+
+.retry-btn {
+    background: none;
+    border: 1px solid #aaa;
+    color: #fff;
+    padding: 6px 16px;
+    border-radius: 6px;
+    margin-top: 15px;
+    cursor: pointer;
+}
+
+.retry-btn:hover {
+    border-color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+}

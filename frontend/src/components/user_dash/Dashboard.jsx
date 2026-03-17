@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Vendors from './Vendors';
 import API_BASE_URL from '../../apiConfig';
+import { useAuth } from '../../App';
 import './Dashboard.css';
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [stats, setStats] = useState({ activeBookings: 0, totalSpent: 0 });
 
   useEffect(() => {
@@ -34,7 +36,7 @@ const Dashboard = () => {
     <div style={styles.container}>
       <div style={styles.header}>
         <h2 style={styles.title}>User Dashboard</h2>
-        <p style={styles.subtitle}>Welcome back, {localStorage.getItem('user_name') || 'User'}!</p>
+        <p style={styles.subtitle}>Welcome back, {user?.name || 'User'}!</p>
       </div>
 
       <div style={styles.statsGrid}>

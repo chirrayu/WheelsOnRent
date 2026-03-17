@@ -2,11 +2,15 @@ import io
 import json
 import base64
 import qrcode
-from datetime import datetime
+import uuid
+from datetime import datetime, timezone, timedelta
 from database import get_db
 from flask import request, jsonify
 from bson import ObjectId
+from socket_service import emit_ride_status_update
 import traceback
+from storage import create_presigned_url
+from security_logger import log_security_event
 
 def generate_booking_qr(booking_id, booking_data):
     """
@@ -22,7 +26,9 @@ def generate_booking_qr(booking_id, booking_data):
             'start_date': booking_data.get('start_date', ''),
             'end_date': booking_data.get('end_date', ''),
             'status': booking_data.get('status', 'confirmed'),
-            'type': 'wheelsonrent_booking'
+            'type': 'wheelsonrent_booking',
+            'nonce': str(uuid.uuid4()),
+            'exp': (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
         }
 
         qr = qrcode.QRCode(
@@ -100,7 +106,7 @@ def get_booking_qr(user_id):
     except Exception as e:
         print(f"Get booking QR error: {str(e)}")
         traceback.print_exc()
-        return jsonify({'error': f'Failed to get QR code: {str(e)}'}), 500
+        return jsonify({'error': 'Failed to get QR code. Please try again.'}), 500
 
 def verify_qr(vendor_id):
     """
@@ -115,6 +121,7 @@ def verify_qr(vendor_id):
 
         qr_data = data.get('qr_data')
         if not qr_data:
+            log_security_event('QR_SCAN_FAIL', {'vendor_id': vendor_id, 'reason': 'missing_data'}, severity='WARNING')
             return jsonify({'error': 'QR data is required'}), 400
 
         # Parse QR payload
@@ -124,16 +131,51 @@ def verify_qr(vendor_id):
             return jsonify({'error': 'Invalid QR code format'}), 400
 
         if payload.get('type') != 'wheelsonrent_booking':
+            log_security_event('QR_SCAN_FAIL', {'vendor_id': vendor_id, 'reason': 'invalid_type'}, severity='WARNING')
             return jsonify({'error': 'This is not a valid WheelsOnRent QR code'}), 400
 
         booking_id = payload.get('booking_id')
         if not booking_id:
             return jsonify({'error': 'Invalid QR code: missing booking ID'}), 400
 
+        # REPLAY PROTECTION: Check Expiry
+        qr_exp = payload.get('exp')
+        if qr_exp:
+            try:
+                exp_dt = datetime.fromisoformat(qr_exp)
+                if datetime.now(timezone.utc) > exp_dt:
+                    log_security_event('QR_REPLAY_ATTEMPT', {'vendor_id': vendor_id, 'booking_id': booking_id, 'reason': 'qr_expired'}, severity='WARNING')
+                    return jsonify({'error': 'QR code has expired. Please ask the user to refresh their screen.'}), 401
+            except Exception:
+                return jsonify({'error': 'Invalid QR expiry format'}), 400
+
         # Find the booking
         booking = db.bookings.find_one({'_id': ObjectId(booking_id)})
         if not booking:
             return jsonify({'error': 'Booking not found'}), 404
+
+        # STATE MACHINE: Check if booking is already completed/cancelled
+        current_status = booking.get('status')
+        if current_status == 'completed':
+             return jsonify({'valid': False, 'error': 'BOOKING_ALREADY_COMPLETED'}), 200
+        if current_status == 'cancelled':
+             return jsonify({'valid': False, 'error': 'BOOKING_ALREADY_CANCELLED'}), 200
+        
+        # TIME WINDOW: Check if user is scanning too early
+        start_date_str = booking.get('start_date')
+        if start_date_str:
+            try:
+                # Handle ISO string
+                parse_start = start_date_str.replace('Z', '+00:00') if 'Z' in start_date_str else start_date_str
+                start_dt = datetime.fromisoformat(parse_start)
+                if start_dt.tzinfo is None:
+                    start_dt = start_dt.replace(tzinfo=timezone.utc)
+                
+                # Allow pick-up 15 minutes early
+                if datetime.now(timezone.utc) < (start_dt - timedelta(minutes=15)):
+                    return jsonify({'valid': False, 'error': f'Pick-up not allowed before {start_dt.strftime("%H:%M")}'}), 200
+            except Exception:
+                pass
 
         # Verify this booking belongs to this vendor's vehicle
         vehicle = db.vehicles.find_one({
@@ -141,7 +183,10 @@ def verify_qr(vendor_id):
             'vendor_id': vendor_id
         })
         if not vehicle:
+            log_security_event('QR_SCAN_FAIL', {'vendor_id': vendor_id, 'booking_id': booking_id, 'reason': 'unauthorized_vehicle'}, severity='WARNING')
             return jsonify({'error': 'This booking does not belong to your vehicle'}), 403
+
+        log_security_event('QR_SCAN_SUCCESS', {'vendor_id': vendor_id, 'booking_id': booking_id, 'user_id': str(booking['user_id'])}, severity='INFO')
 
         # Get user details
         user = db.users.find_one({'_id': ObjectId(booking['user_id'])})
@@ -153,15 +198,23 @@ def verify_qr(vendor_id):
         
         # Determine DL image: check booking first, then profile fallback
         dl_image = booking.get('dl_image')
-        if not dl_image:
-            dl_profile = db.dl_uploads.find_one({'user_id': str(user['_id'])})
+        if not dl_image or str(dl_image).strip() == "":
+            # Try finding in profile uploads as fallback
+            uid_str = str(user['_id'])
+            # Search by string user_id OR ObjectId user_id to be extra safe
+            dl_profile = db.dl_uploads.find_one({
+                '$or': [{'user_id': uid_str}, {'user_id': user['_id']}]
+            })
+            
             if dl_profile:
                 dl_image = dl_profile.get('image_url') or dl_profile.get('image_filename')
-                print(f"DEBUG: Found profile fallback DL for user {user['_id']}: {dl_image}")
+                print(f"DEBUG: Found profile fallback DL for user {uid_str}: {dl_image}")
 
+        if dl_image and isinstance(dl_image, str) and "amazonaws.com" in dl_image:
+            dl_image = create_presigned_url(dl_image)
         # 2. Check if time is within booking window (buffer of 30 mins)
         try:
-            current_time = datetime.now()
+            current_time = datetime.now(timezone.utc)
             # Assuming start_date is in ISO format or DD-MM-YYYY HH:MM
             # For simplicity, we just check if it's today if date format matches
             start_date_str = booking.get('start_date', '')
@@ -176,10 +229,12 @@ def verify_qr(vendor_id):
             pass # Skip time check if format is unknown
 
         # 3. Check status
-        if booking.get('status') != 'confirmed' and booking.get('status') != 'Upcoming':
+        allowed_statuses = ['confirmed', 'active', 'Upcoming']
+        current_status = booking.get('status')
+        if current_status not in allowed_statuses:
             return jsonify({
                 'valid': False,
-                'error': f'Booking is already {booking.get("status")}',
+                'error': f'Booking is already {current_status}',
                 'user_name': user_name
             }), 200
 
@@ -205,7 +260,7 @@ def verify_qr(vendor_id):
     except Exception as e:
         print(f"Verify QR error: {str(e)}")
         traceback.print_exc()
-        return jsonify({'error': f'QR verification failed: {str(e)}'}), 500
+        return jsonify({'error': 'QR verification failed. Please try again.'}), 500
 
 def update_ride_status(vendor_id):
     """
@@ -238,23 +293,33 @@ def update_ride_status(vendor_id):
         if not vehicle:
             return jsonify({'error': 'Unauthorized: not your vehicle'}), 403
 
-        # Validate status transitions
-        current_status = booking.get('status', '')
-        if new_status == 'active' and current_status != 'confirmed':
-            return jsonify({'error': f'Cannot start ride: booking is "{current_status}", expected "confirmed"'}), 400
-        if new_status == 'completed' and current_status != 'active':
-            return jsonify({'error': f'Cannot complete ride: booking is "{current_status}", expected "active"'}), 400
+        # Strict State Machine Validation
+        current_status = booking.get('status', 'pending')
+        valid_transitions = {
+            'confirmed': ['active', 'cancelled'],
+            'Upcoming': ['active', 'cancelled'],
+            'active': ['completed', 'cancelled'],
+            'completed': [], # Terminal state
+            'cancelled': []  # Terminal state
+        }
+        
+        if new_status not in valid_transitions.get(current_status, []):
+            return jsonify({'error': f'Invalid status transition from "{current_status}" to "{new_status}".'}) , 400
 
         update_fields = {'status': new_status}
         if new_status == 'active':
-            update_fields['ride_started_at'] = datetime.utcnow()
+            update_fields['ride_started_at'] = datetime.now(timezone.utc)
         elif new_status == 'completed':
-            ride_completed_at = datetime.utcnow()
+            ride_completed_at = datetime.now(timezone.utc)
             update_fields['ride_completed_at'] = ride_completed_at
             
             # Calculate final amount
             ride_started_at = booking.get('ride_started_at')
             if ride_started_at:
+                if isinstance(ride_started_at, str):
+                    ride_started_at = datetime.fromisoformat(ride_started_at.replace('Z', '+00:00'))
+                if ride_started_at.tzinfo is None:
+                    ride_started_at = ride_started_at.replace(tzinfo=timezone.utc)
                 duration = ride_completed_at - ride_started_at
                 seconds = duration.total_seconds()
                 hours = seconds / 3600
@@ -284,20 +349,12 @@ def update_ride_status(vendor_id):
                 {'_id': ObjectId(booking['vehicle_id'])},
                 {'$set': {'is_available': True}}
             )
-            db.vehicle_available.update_one(
-                {'vehicle_id': booking['vehicle_id']},
-                {'$set': {'is_available': True}}
-            )
         elif new_status == 'cancelled':
-            update_fields['cancelled_at'] = datetime.utcnow()
+            update_fields['cancelled_at'] = datetime.now(timezone.utc)
             update_fields['cancelled_by'] = 'vendor'
             # Make vehicle available again
             db.vehicles.update_one(
                 {'_id': ObjectId(booking['vehicle_id'])},
-                {'$set': {'is_available': True}}
-            )
-            db.vehicle_available.update_one(
-                {'vehicle_id': booking['vehicle_id']},
                 {'$set': {'is_available': True}}
             )
 
@@ -305,6 +362,19 @@ def update_ride_status(vendor_id):
             {'_id': ObjectId(booking_id)},
             {'$set': update_fields}
         )
+
+        # Real-time notification to user
+        try:
+            user_id = str(booking.get('user_id'))
+            emit_ride_status_update(user_id, {
+                'booking_id': str(booking_id),
+                'status': new_status,
+                'final_amount': update_fields.get('final_amount'),
+                'total_duration': update_fields.get('total_duration'),
+                'message': f"Your ride is now {new_status}!"
+            })
+        except Exception as e:
+            print(f"DEBUG: WebSocket notification failed: {str(e)}")
 
         status_messages = {
             'active': 'Ride started!',
@@ -326,4 +396,4 @@ def update_ride_status(vendor_id):
     except Exception as e:
         print(f"Update ride status error: {str(e)}")
         traceback.print_exc()
-        return jsonify({'error': f'Status update failed: {str(e)}'}), 500
+        return jsonify({'error': 'Status update failed. Please try again.'}), 500

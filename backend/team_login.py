@@ -1,8 +1,8 @@
 from database import get_db
-from flask import request, jsonify
+from flask import request, jsonify, make_response
 import jwt
 import bcrypt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from bson import ObjectId
 import traceback
 from config import Config
@@ -36,7 +36,7 @@ def team_login():
         # Update last login time
         db.teams.update_one(
             {'_id': team_member['_id']},
-            {'$set': {'last_login': datetime.utcnow()}}
+            {'$set': {'last_login': datetime.now(timezone.utc)}}
         )
 
         # Generate JWT token
@@ -44,10 +44,10 @@ def team_login():
             'team_id': str(team_member['_id']),
             'phone': team_member['phone'],
             'role': team_member.get('role', 'team'),
-            'exp': datetime.utcnow() + timedelta(hours=24)
+            'exp': datetime.now(timezone.utc) + timedelta(hours=24)
         }, Config.SECRET_KEY, algorithm='HS256')
 
-        return jsonify({
+        response = make_response(jsonify({
             'message': 'Team login successful',
             'token': token,
             'user': {
@@ -57,9 +57,17 @@ def team_login():
                 'role': team_member.get('role', 'team'),
                 'email': team_member.get('email', '')
             }
-        }), 200
+        }), 200)
+        response.set_cookie(
+            'access_token', token,
+            httponly=True,
+            secure=Config.ENV == 'production',
+            samesite='Lax',
+            max_age=86400
+        )
+        return response
 
     except Exception as e:
         print(f"Team login error: {str(e)}")
         print(traceback.format_exc())
-        return jsonify({'error': f'Team login failed: {str(e)}'}), 500
+        return jsonify({'error': 'Team login failed. Please try again.'}), 500

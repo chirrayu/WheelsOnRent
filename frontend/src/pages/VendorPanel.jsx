@@ -405,8 +405,16 @@ const VendorPanel = () => {
                     <span className={`status-badge-v2 ${b.status === 'active' ? 'badge-available' : 'badge-booked'}`}>
                       {b.status}
                     </span>
-                    {b.status === 'confirmed' && <button onClick={() => handleUpdateBookingStatus(b._id, 'active')} className="btn-premium btn-primary" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>Start</button>}
-                    {b.status === 'active' && <button onClick={() => handleUpdateBookingStatus(b._id, 'completed')} className="btn-premium btn-danger" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>Stop</button>}
+                    {b.dl_image && (
+                      <button 
+                        onClick={() => window.open(b.dl_image.startsWith('http') ? b.dl_image : `${API_BASE_URL}${b.dl_image}`, '_blank')}
+                        className="btn-premium" 
+                        style={{ padding: '6px 12px', fontSize: '0.85rem', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1' }}>
+                        🪪 View DL
+                      </button>
+                    )}
+                    {b.status === 'confirmed' && <button onClick={() => handleUpdateBookingStatus(b._id, 'active')} disabled={loading} className="btn-premium btn-primary" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>{loading ? '...' : 'Start'}</button>}
+                    {b.status === 'active' && <button onClick={() => handleUpdateBookingStatus(b._id, 'completed')} disabled={loading} className="btn-premium btn-danger" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>{loading ? '...' : 'Stop'}</button>}
                   </div>
                 </div>
               ))}

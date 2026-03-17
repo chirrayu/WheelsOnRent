@@ -294,25 +294,13 @@ const QRScanner = () => {
                         <div style={s.detailSection}>
                             <h4 style={s.sectionLabel}>🪪 Driving License</h4>
                             {bookingDetails.dl_image ? (
-                                <div style={{ textAlign: 'center' }}>
-                                    <img
-                                        src={bookingDetails.dl_image.startsWith('http') ? bookingDetails.dl_image : `${API_BASE_URL}${bookingDetails.dl_image}`}
-                                        alt="User Driving License"
-                                        style={{
-                                            maxWidth: '100%',
-                                            maxHeight: '300px',
-                                            borderRadius: '8px',
-                                            border: '2px solid #e2e8f0',
-                                            objectFit: 'contain',
-                                            cursor: 'pointer'
-                                        }}
-                                        onClick={(e) => {
-                                            window.open(e.target.src, '_blank');
-                                        }}
-                                    />
-                                    <p style={{ fontSize: '0.75rem', color: '#94a3b8', margin: '8px 0 0 0' }}>
-                                        Click image to view full size
-                                    </p>
+                                <div style={{ textAlign: 'center', padding: '20px', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
+                                    <button 
+                                        onClick={() => window.open(bookingDetails.dl_image.startsWith('http') ? bookingDetails.dl_image : `${API_BASE_URL}${bookingDetails.dl_image}`, '_blank')}
+                                        className="btn-premium btn-primary"
+                                        style={{ padding: '10px 20px', fontSize: '1rem', width: '100%' }}>
+                                        🪪 View User's Driving License
+                                    </button>
                                 </div>
                             ) : (
                                 <div style={{
