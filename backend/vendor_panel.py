@@ -16,7 +16,7 @@ def get_vendor_profile(vendor_id):
         db = get_db()
         
         # Find vendor in database (Excluding password)
-        vendor = db.vendors.find_one({'_id': ObjectId(vendor_id)}, {'password': 0})
+        vendor = db.vendors.find_one({'_id': ObjectId(str(vendor_id))}, {'password': 0})
         if not vendor:
             return jsonify({'error': 'Vendor not found'}), 404
 
@@ -66,7 +66,7 @@ def update_vendor_profile(vendor_id):
 
         # Update vendor
         result = db.vendors.update_one(
-            {'_id': ObjectId(vendor_id)},
+            {'_id': ObjectId(str(vendor_id))},
             {'$set': update_fields}
         )
         
@@ -95,7 +95,7 @@ def get_vendor_vehicles(vendor_id):
         limit = min(100, max(1, int(request.args.get('limit', 20))))
         skip = (page - 1) * limit
         
-        query = {'vendor_id': vendor_id}
+        query = {'vendor_id': str(vendor_id)}
         total_count = db.vehicles.count_documents(query)
         vehicles_cursor = db.vehicles.find(query).skip(skip).limit(limit)
         vehicles = []
@@ -136,14 +136,20 @@ def add_vehicle_to_vendor(vendor_id):
         daily_rate = data.get('daily_rate')
         hourly_rate = data.get('hourly_rate')
         description = data.get('description', '')
-        location = data.get('location', '')
+        # Robustness: Fetch location_id from vendor profile if missing in payload
+        location_id = data.get('location_id')
+        if not location_id:
+            vendor = db.vendors.find_one({'_id': ObjectId(str(vendor_id))}, {'location_id': 1})
+            location_id = vendor.get('location_id') if vendor else None
+            print(f"DEBUG: Auto-resolved location_id: {location_id}")
+
         features = data.get('features', [])
         images = data.get('images', [])
         condition = data.get('condition', '')
 
         # Validation
-        if not vehicle_type or not model or not make or not license_plate or not daily_rate:
-            return jsonify({'error': 'Vehicle type, model, make, license plate, and daily rate are required'}), 400
+        if not vehicle_type or not model or not make or not license_plate or not daily_rate or not location_id:
+            return jsonify({'error': 'Vehicle type, model, make, license plate, daily rate, and location are required'}), 400
 
         # Check if vehicle with this license plate already exists
         existing_vehicle = db.vehicles.find_one({'license_plate': str(license_plate)})
@@ -151,14 +157,14 @@ def add_vehicle_to_vendor(vendor_id):
             return jsonify({'error': 'Vehicle with this license plate already exists'}), 409
 
         # Get vendor name
-        vendor = db.vendors.find_one({'_id': ObjectId(vendor_id)})
+        vendor = db.vendors.find_one({'_id': ObjectId(str(vendor_id))})
         vendor_name = vendor.get('name', 'Unknown') if vendor else 'Unknown'
 
         fuel_type = data.get('fuel_type', 'Petrol')
 
         # Create new vehicle document
         new_vehicle = {
-            'vendor_id': vendor_id,
+            'vendor_id': str(vendor_id),
             'vehicle_type': vehicle_type,
             'model': model,
             'make': make,
@@ -166,7 +172,7 @@ def add_vehicle_to_vendor(vendor_id):
             'daily_rate': daily_rate,
             'hourly_rate': hourly_rate,
             'condition': condition,
-            'location': location,
+            'location_id': location_id,
             'fuel_type': fuel_type,
             'is_available': True,
             'created_at': datetime.now(timezone.utc)
@@ -204,7 +210,7 @@ def get_vendor_bookings(vendor_id):
         skip = (page - 1) * limit
         
         # Find vehicles owned by this vendor
-        vendor_vehicles = list(db.vehicles.find({'vendor_id': vendor_id}))
+        vendor_vehicles = list(db.vehicles.find({'vendor_id': str(vendor_id)}))
         vendor_vehicle_ids = [str(vehicle['_id']) for vehicle in vendor_vehicles]
         vehicle_map = {str(v['_id']): v.get('model', 'Unknown') for v in vendor_vehicles}
         
@@ -272,8 +278,8 @@ def update_vehicle_by_vendor(vendor_id, vehicle_id):
 
         # Verify vendor owns this vehicle
         vehicle = db.vehicles.find_one({
-            '_id': ObjectId(vehicle_id),
-            'vendor_id': vendor_id
+            '_id': ObjectId(str(vehicle_id)),
+            'vendor_id': str(vendor_id)
         })
         if not vehicle:
             return jsonify({'error': 'Vehicle not found or unauthorized'}), 404
@@ -281,7 +287,7 @@ def update_vehicle_by_vendor(vendor_id, vehicle_id):
         # Allowed update fields
         update_fields = {}
         for key in ['model', 'make', 'vehicle_type', 'license_plate', 'daily_rate', 'hourly_rate',
-                     'condition', 'location', 'fuel_type', 'is_available']:
+                     'condition', 'location_id', 'fuel_type', 'is_available']:
             if key in data:
                 update_fields[key] = data[key]
 

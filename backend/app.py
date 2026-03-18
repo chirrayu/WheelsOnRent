@@ -203,7 +203,7 @@ def vendor_token_required(f):
             # STRICT: Verify token version against DB (Use projection)
             db = database.get_db()
             vendor = db.vendors.find_one(
-                {'_id': database.ObjectId(vendor_id)},
+                {'_id': database.ObjectId(str(vendor_id))},
                 {'token_version': 1}
             )
             if not vendor or vendor.get('token_version', 0) != token_version:
@@ -345,8 +345,17 @@ def get_vendor_vehicles_public_route(current_user_id, vendor_id):
         from bson import ObjectId
         db = get_db()
         
-        # Find active vehicles for this vendor - CAST TO STRING
-        query = {'vendor_id': str(vendor_id), 'is_available': True}
+        # Explicitly cast to string to prevent NoSQL injection
+        vendor_id = str(vendor_id)
+        
+        # Find active vehicles for this vendor - Robust check for both string and ObjectId
+        query = {
+            '$or': [
+                {'vendor_id': str(vendor_id)},
+                {'vendor_id': ObjectId(vendor_id)}
+            ],
+            'is_available': True
+        }
         vehicles_cursor = db.vehicles.find(query)
         
         vehicles = []

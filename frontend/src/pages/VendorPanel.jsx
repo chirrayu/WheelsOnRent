@@ -33,8 +33,8 @@ const VendorPanel = () => {
     license_plate: '',
     daily_rate: '',
     hourly_rate: '',
-    condtion: '',
-    location: '',
+    condition: '',
+    location_id: user?.location_id || '',
     fuel_type: 'Petrol',
     is_available: true
   });
@@ -132,6 +132,7 @@ const VendorPanel = () => {
         },
         body: JSON.stringify({
           ...vehicleForm,
+          location_id: vehicleForm.location_id || user?.location_id || '',
           daily_rate: parseFloat(vehicleForm.daily_rate),
           hourly_rate: vehicleForm.hourly_rate ? parseFloat(vehicleForm.hourly_rate) : 0
         })
@@ -143,7 +144,7 @@ const VendorPanel = () => {
         setSuccess(editingVehicle ? 'Vehicle updated successfully!' : 'Vehicle added successfully!');
         setShowAddVehicle(false);
         setEditingVehicle(null);
-        setVehicleForm({ vehicle_type: '', model: '', make: '', license_plate: '', daily_rate: '', hourly_rate: '', condtion: '', location: '', fuel_type: 'Petrol', is_available: true });
+        setVehicleForm({ vehicle_type: '', model: '', make: '', license_plate: '', daily_rate: '', hourly_rate: '', condition: '', location_id: user?.location_id || '', fuel_type: 'Petrol', is_available: true });
         fetchVehicles();
         setTimeout(() => setSuccess(''), 3000);
       } else {
@@ -156,12 +157,16 @@ const VendorPanel = () => {
     }
   };
 
-  const handleUpdateBookingStatus = async (bookingId, newStatus) => {
+  const handleUpdateBookingStatus = async (bookingId, newStatus, currentStatus = '') => {
     const confirmMessages = {
       active: 'Approve this booking and start the ride?',
       completed: 'Complete the ride? The final bill will be generated.',
       cancelled: 'Reject this booking?'
     };
+
+    if (newStatus === 'active' && currentStatus === 'pending_manual_verification') {
+        if (!window.confirm('This booking requires manual DL verification. Have you verified the original DL?')) return;
+    }
 
     if (!window.confirm(confirmMessages[newStatus] || 'Update status?')) return;
 
@@ -268,8 +273,8 @@ const VendorPanel = () => {
                           <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{booking.user_name} • #{booking._id?.slice(-6).toUpperCase()}</div>
                         </div>
                       </div>
-                      <span className={`status-badge-v2 ${booking.status === 'active' ? 'badge-available' : 'badge-booked'}`}>
-                        {booking.status}
+                      <span className={`status-badge-v2 ${booking.status === 'active' ? 'badge-available' : booking.status === 'pending_manual_verification' ? 'badge-pending' : 'badge-booked'}`}>
+                        {booking.status === 'pending_manual_verification' ? 'Review Required' : booking.status}
                       </span>
                     </div>
                   ))}
@@ -289,8 +294,8 @@ const VendorPanel = () => {
             license_plate: vehicle.license_plate || '',
             daily_rate: vehicle.daily_rate || '',
             hourly_rate: vehicle.hourly_rate || '',
-            condtion: vehicle.condtion || '',
-            location: vehicle.location || '',
+            condition: vehicle.condition || '',
+            location_id: vehicle.location_id || user?.location_id || '',
             fuel_type: vehicle.fuel_type || 'Petrol',
             is_available: vehicle.is_available !== false
           });
@@ -307,7 +312,7 @@ const VendorPanel = () => {
 
             {showAddVehicle && (
               <div style={{ ...inlineStyles.whiteCard, marginBottom: '32px', borderRadius: '24px', border: '1px solid #6366f1' }}>
-                <h3 style={{ margin: '0 0 24px 0', fontSize: '1.25rem', fontWeight: '700' }}>{editingVehicle ? 'Edit Vehicle' : 'Register Vehicle'}</h3>
+                <h3 style={{ margin: '0 0 29px 0', fontSize: '1.25rem', fontWeight: '700' }}>{editingVehicle ? 'Edit Vehicle' : 'Register Vehicle'}</h3>
                 <form onSubmit={handleAddVehicle}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px' }}>
                     <div className="form-group">
@@ -336,7 +341,7 @@ const VendorPanel = () => {
                     </div>
                     <div className="form-group">
                       <label style={inlineStyles.formLabel}>Condition</label>
-                      <input type="text" value={vehicleForm.condtion} onChange={e => setVehicleForm({ ...vehicleForm, condtion: e.target.value })} style={{ ...inlineStyles.formInput, borderRadius: '12px' }} placeholder="e.g. Excellent, Good" />
+                      <input type="text" value={vehicleForm.condition} onChange={e => setVehicleForm({ ...vehicleForm, condition: e.target.value })} style={{ ...inlineStyles.formInput, borderRadius: '12px' }} placeholder="e.g. Excellent, Good" />
                     </div>
                     <div className="form-group">
                       <label style={inlineStyles.formLabel}>License</label>
@@ -402,19 +407,20 @@ const VendorPanel = () => {
                     </div>
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'flex-end', minWidth: '150px' }}>
-                    <span className={`status-badge-v2 ${b.status === 'active' ? 'badge-available' : 'badge-booked'}`}>
-                      {b.status}
+                    <span className={`status-badge-v2 ${b.status === 'active' ? 'badge-available' : b.status === 'pending_manual_verification' ? 'badge-pending' : 'badge-booked'}`}>
+                      {b.status === 'pending_manual_verification' ? 'Review Required' : b.status}
                     </span>
                     {b.dl_image && (
-                      <button 
+                      <button
                         onClick={() => window.open(b.dl_image.startsWith('http') ? b.dl_image : `${API_BASE_URL}${b.dl_image}`, '_blank')}
-                        className="btn-premium" 
+                        className="btn-premium"
                         style={{ padding: '6px 12px', fontSize: '0.85rem', backgroundColor: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1' }}>
                         🪪 View DL
                       </button>
                     )}
-                    {b.status === 'confirmed' && <button onClick={() => handleUpdateBookingStatus(b._id, 'active')} disabled={loading} className="btn-premium btn-primary" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>{loading ? '...' : 'Start'}</button>}
-                    {b.status === 'active' && <button onClick={() => handleUpdateBookingStatus(b._id, 'completed')} disabled={loading} className="btn-premium btn-danger" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>{loading ? '...' : 'Stop'}</button>}
+                    {b.status === 'confirmed' && <button onClick={() => handleUpdateBookingStatus(b._id, 'active', b.status)} disabled={loading} className="btn-premium btn-primary" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>{loading ? '...' : 'Start'}</button>}
+                    {b.status === 'pending_manual_verification' && <button onClick={() => handleUpdateBookingStatus(b._id, 'active', b.status)} disabled={loading} className="btn-premium btn-primary" style={{ padding: '6px 12px', fontSize: '0.85rem', background: '#f59e0b' }}>{loading ? '...' : 'Verify & Start'}</button>}
+                    {b.status === 'active' && <button onClick={() => handleUpdateBookingStatus(b._id, 'completed', b.status)} disabled={loading} className="btn-premium btn-danger" style={{ padding: '6px 12px', fontSize: '0.85rem' }}>{loading ? '...' : 'Stop'}</button>}
                   </div>
                 </div>
               ))}
@@ -461,11 +467,11 @@ const VendorPanel = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                     <span style={{ fontSize: '1.5rem' }}>📞</span>
-                    <span>+91 999 000 111</span>
+                    <span>+91 762 709 0578</span>
                   </div>
                   <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                     <span style={{ fontSize: '1.5rem' }}>✉️</span>
-                    <span>support@wheelsonrent.com</span>
+                    <span>chirrayusharma@gmail.com</span>
                   </div>
                 </div>
               </div>

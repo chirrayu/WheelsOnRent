@@ -355,6 +355,11 @@
   background: #fee2e2;
   color: #dc2626;
 }
+.badge-pending {
+  background: #fff7ed;
+  color: #f59e0b;
+  border: 1px solid #fed7aa;
+}
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {

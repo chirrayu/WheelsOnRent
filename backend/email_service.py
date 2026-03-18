@@ -95,8 +95,14 @@ def otp_sending_function(email, OTP):
         return False
 
 
-def ride_confirm_qr(email, QR_CODE, BOOKING_ID, PICKUP_DATE):
+import base64
+
+def ride_confirm_qr(email, QR_CODE_BASE64, BOOKING_ID, PICKUP_DATE):
     try:
+        # If the QR code string contains the data URI prefix, strip it
+        if "," in QR_CODE_BASE64:
+            QR_CODE_BASE64 = QR_CODE_BASE64.split(",")[1]
+        
         params = {
             "from": "WheelsOnRent <onboarding@wheelsonrentroad.com>",
             "to": [email],
@@ -142,7 +148,7 @@ def ride_confirm_qr(email, QR_CODE, BOOKING_ID, PICKUP_DATE):
           <td align="center" style="padding:20px 40px;">
             <div style="background:#faf5ff; border:1px solid #e9d5ff;
                         border-radius:14px; padding:25px;">
-              <img src="{QR_CODE}" alt="Booking QR Code"
+              <img src="cid:qrcode" alt="Booking QR Code"
                 style="width:180px; height:180px; display:block; margin:auto;" />
             </div>
           </td>
@@ -188,7 +194,14 @@ def ride_confirm_qr(email, QR_CODE, BOOKING_ID, PICKUP_DATE):
   </tr>
   </table>
 
-  """
+  """,
+            "attachments": [
+                {
+                    "content": list(base64.b64decode(QR_CODE_BASE64)),
+                    "filename": "qrcode.png",
+                    "content_id": "qrcode"
+                }
+            ]
         }
 
         _send_email_async(params, "Booking confirmation email")

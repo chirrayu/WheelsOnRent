@@ -11,6 +11,37 @@ from dl_validator import validate_indian_dl_number, validate_dl_dates
 
 logger = logging.getLogger(__name__)
 
+def check_dl_authenticity(lines):
+    """
+    Checks if the OCR lines contain standard Indian DL keywords/markers.
+    Returns: (is_authentic, confidence_score, reasons)
+    """
+    if not lines or len(lines) < 3:
+        return False, 0, ["Insufficient text found"]
+
+    keywords = {
+        'header': [r"Indian Union", r"Driving Licen[sc]e", r"Republic of India"],
+        'authority': [r"Issued by", r"Government of", r"Transport Department"],
+        'fields': [r"Validity", r"Issue Date", r"Date of Birth", r"DOB", r"Authorization"],
+        'class': [r"LMV", r"MCWG", r"MC", r"HGV", r"TRANS"]
+    }
+    
+    found_categories = set()
+    full_text = " ".join(lines).lower()
+    
+    score = 0
+    for category, patterns in keywords.items():
+        for pattern in patterns:
+            if re.search(pattern, full_text, re.IGNORECASE):
+                found_categories.add(category)
+                score += 25 # Each category adds to the score
+                break
+    
+    is_authentic = score >= 75 # Stricter: Need at least 3 categories to be considered authentic
+    reasons = list(found_categories)
+    
+    return is_authentic, score, reasons
+
 def extract_data_from_lines(lines):
     """
     Heuristic to find DL Number and dates from raw OCR lines.
@@ -123,14 +154,27 @@ def verify_dl_image(s3_key=None, image_bytes=None):
             return 'error', 'No image data provided for verification', {}
 
         if ocr_lines:
+            # 1. Basic extraction (DL Number, Dates)
             extracted = extract_data_from_lines(ocr_lines)
+            
+            # 2. Authenticity Verification (Keyword based)
+            is_authentic, auth_score, auth_reasons = check_dl_authenticity(ocr_lines)
+            
             extraction_results = {
                 'raw_lines': ocr_lines,
-                'identified': extracted
+                'identified': extracted,
+                'authenticity': {
+                    'is_authentic': is_authentic,
+                    'score': auth_score,
+                    'reasons': auth_reasons
+                }
             }
             
-            # Automated Validation Check: Need DL AND Valid Expiry
-            if extracted['dl_number'] and extracted['expiry']:
+            # 3. Decision Logic
+            if not is_authentic:
+                status = 'flagged'
+                validation_message = "Invalid document: Standard Indian DL markers not found. Please upload a clear photo of your original DL."
+            elif extracted['dl_number'] and extracted['expiry']:
                 expiry_dt = datetime.strptime(extracted['expiry'], '%Y-%m-%d').replace(tzinfo=timezone.utc)
                 if expiry_dt > datetime.now(timezone.utc):
                     status = 'verified'
@@ -146,7 +190,7 @@ def verify_dl_image(s3_key=None, image_bytes=None):
                 validation_message = "Indian DL number not clearly identified. Manual review required."
         else:
             status = 'flagged'
-            validation_message = "OCR analysis failed to read text from image. Manual review required."
+            validation_message = "Invalid document: OCR analysis failed to read text. Please ensure you upload a clear photo of your Indian DL."
             
     except Exception as e:
         print(f"DL Verification Service Error: {str(e)}")

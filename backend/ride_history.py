@@ -80,10 +80,11 @@ def create_booking(user_id):
             booking_type = request.form.get('booking_type', 'daily')
         else:
             data = request.get_json()
-            vehicle_id = data.get('vehicle_id')
-            start_date = data.get('start_date')
-            end_date = data.get('end_date')
-            booking_type = data.get('booking_type', 'daily')
+            # Explicitly cast to string to prevent NoSQL injection via JSON objects
+            vehicle_id = str(data.get('vehicle_id', ''))
+            start_date = str(data.get('start_date', ''))
+            end_date = str(data.get('end_date', ''))
+            booking_type = str(data.get('booking_type', 'daily'))
         
         if not vehicle_id or not start_date:
             print(f"DEBUG: Missing fields. vehicle_id: {vehicle_id}, start_date: {start_date}")
@@ -94,7 +95,7 @@ def create_booking(user_id):
         # Check if user already has an active, confirmed or upcoming booking
         existing_booking = db.bookings.find_one({
             'user_id': user_id,
-            'status': {'$in': ['confirmed', 'active', 'Upcoming']}
+            'status': {'$in': ['confirmed', 'active', 'Upcoming', 'pending_manual_verification']}
         })
         
         if existing_booking:
@@ -147,7 +148,7 @@ def create_booking(user_id):
         # This prevents booking a vehicle that is "available" now but has a conflict in the requested slot.
         overlap_query = {
             'vehicle_id': vehicle_id,
-            'status': {'$in': ['confirmed', 'active', 'Upcoming']},
+            'status': {'$in': ['confirmed', 'active', 'Upcoming', 'pending_manual_verification']},
             '$or': [
                 {
                     'start_date': {'$lte': end_date if end_date else start_date},
@@ -158,11 +159,9 @@ def create_booking(user_id):
         if db.bookings.find_one(overlap_query, {'_id': 1}):
              return jsonify({'error': 'Vehicle is already booked for the selected time slot.'}), 400
         
-        # Atomically check AND reserve the vehicle in one step
-        vehicle = db.vehicles.find_one_and_update(
-            {'_id': ObjectId(vehicle_id), 'is_available': True},
-            {'$set': {'is_available': False}},
-            return_document=ReturnDocument.BEFORE
+        # Verify vehicle exists and is active
+        vehicle = db.vehicles.find_one(
+            {'_id': ObjectId(vehicle_id), 'is_available': True}
         )
         
         if not vehicle:
@@ -205,30 +204,27 @@ def create_booking(user_id):
                         # Validate dates (Age and Expiry)
                         is_valid_dates, date_err = validate_dl_dates(dob_date if dob_date else "2000-01-01", expiry_date)
                         if not is_valid_dates:
-                            # Rollback reservation
-                            db.vehicles.update_one({'_id': ObjectId(vehicle_id)}, {'$set': {'is_available': True}})
                             log_security_event('BOOKING_BLOCKED_DL', {'user_id': user_id, 'reason': date_err}, severity='WARNING')
                             return jsonify({'error': f'Booking blocked: {date_err}'}), 400
                     
                     # 3. S3 Upload (If scan passed or requires manual review)
                     dl_image_path = upload_to_s3(dl_file)
                     if not dl_image_path:
-                        # Rollback reservation
-                        db.vehicles.update_one({'_id': ObjectId(vehicle_id)}, {'$set': {'is_available': True}})
                         return jsonify({'error': 'Failed to upload DL image.'}), 400
                     
                     dl_verification_status = val_status
                     dl_extraction_data = extraction
                     print(f"DEBUG: DL Verification Result: {val_status}. Path: {dl_image_path}")
                 except Exception as upload_err:
-                    # Rollback reservation
-                    db.vehicles.update_one({'_id': ObjectId(vehicle_id)}, {'$set': {'is_available': True}})
                     print(f"ERROR: DL validation/upload Exception: {str(upload_err)}")
                     return jsonify({'error': f'Failed to process Driving License: {str(upload_err)}'}), 500
 
         # Determine initial booking status
         # If OCR flagged it, we might want manual review before 'confirmed'
-        # But for now, we follow business logic: block if definitely invalid, else confirm.
+        # BUT if it's completely invalid (e.g. not even a DL), we block it immediately.
+        if dl_verification_status == 'flagged' and "Invalid document" in str(val_msg):
+            return jsonify({'error': val_msg}), 400
+
         booking_status = 'confirmed' if dl_verification_status != 'flagged' else 'pending_manual_verification'
 
         # Create booking document
@@ -250,6 +246,26 @@ def create_booking(user_id):
         
         result = db.bookings.insert_one(new_booking)
         booking_id = str(result.inserted_id)
+
+        # ATOMIC SECONDARY CHECK: Verify no other booking was created in parallel
+        # This prevents the TOCTOU (Time-of-check to Time-of-use) race condition.
+        final_overlap_check = db.bookings.find_one({
+            'vehicle_id': vehicle_id,
+            'status': {'$in': ['confirmed', 'active', 'Upcoming', 'pending_manual_verification']},
+            '_id': {'$ne': result.inserted_id}, # Don't conflict with itself
+            '$or': [
+                {
+                    'start_date': {'$lte': end_date if end_date else start_date},
+                    'end_date': {'$gte': start_date}
+                }
+            ]
+        }, {'_id': 1})
+
+        if final_overlap_check:
+            # Atomic Rollback: Delete the second booking that slipped through
+            db.bookings.delete_one({'_id': result.inserted_id})
+            log_security_event('RACE_CONDITION_DETECTED', {'user_id': user_id, 'vehicle_id': vehicle_id}, severity='CRITICAL')
+            return jsonify({'error': 'A race condition occurred. Vehicle was booked by someone else at the same time. Please try again.'}), 400
         
         print(f"DEBUG: Booking inserted. ID: {booking_id}, Status: {booking_status}")
         
@@ -270,9 +286,7 @@ def create_booking(user_id):
                 
                 if user_email:
                     try:
-                        # Ensure QR code format for image src
-                        qr_src = qr_base64 if qr_base64.startswith('data:image') else f"data:image/png;base64,{qr_base64}"
-                        email_sent = ride_confirm_qr(user_email, qr_src, booking_id, start_date)
+                        email_sent = ride_confirm_qr(user_email, qr_base64, booking_id, start_date)
                         print(f"DEBUG: Email send result: {email_sent}")
                     except Exception as e:
                         print(f"DEBUG: Email sending crashed: {str(e)}")
@@ -346,14 +360,6 @@ def cancel_booking(user_id):
             {'_id': ObjectId(booking_id)},
             {'$set': {'status': 'cancelled', 'cancelled_at': datetime.now(timezone.utc)}}
         )
-        
-        # Make vehicle available again
-        vehicle_id = booking.get('vehicle_id')
-        if vehicle_id:
-            db.vehicles.update_one(
-                {'_id': ObjectId(vehicle_id)},
-                {'$set': {'is_available': True}}
-            )
 
         
         # Clear availability cache
@@ -375,7 +381,7 @@ def get_available_vehicles():
         db = get_db()
         
         # Get query parameters
-        location = request.args.get('location')
+        location_id = request.args.get('location_id')
         start_date_str = request.args.get('start_date')
         end_date_str = request.args.get('end_date')
         page = max(1, int(request.args.get('page', 1)))
@@ -384,11 +390,11 @@ def get_available_vehicles():
         
         query = {'is_available': True}
         
-        if location:
-            query['location'] = location
+        if location_id:
+            query['location_id'] = location_id
         
         # 1. Try Cache First
-        cache_key = f"vehicles:available:{location}:{start_date_str}:{end_date_str}:{page}:{limit}"
+        cache_key = f"vehicles:available:{location_id}:{start_date_str}:{end_date_str}:{page}:{limit}"
         cached_res = get_cache(cache_key)
         if cached_res:
             return jsonify(cached_res), 200
@@ -404,7 +410,7 @@ def get_available_vehicles():
             if start_date_str and end_date_str:
                 overlapping_booking = db.bookings.find_one({
                     'vehicle_id': vehicle_id,
-                    'status': {'$in': ['confirmed', 'active']},
+                    'status': {'$in': ['confirmed', 'active', 'Upcoming', 'pending_manual_verification']},
                     '$or': [
                         {
                             'start_date': {'$lte': end_date_str},

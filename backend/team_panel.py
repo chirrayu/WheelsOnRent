@@ -217,7 +217,8 @@ def vendor_login():
                 'name': vendor['name'],
                 'username': vendor.get('username', ''),
                 'email': vendor.get('email', ''),
-                'role': vendor.get('role', 'vendor')
+                'role': vendor.get('role', 'vendor'),
+                'location_id': vendor.get('location_id', '')
             }
         }), 200
 

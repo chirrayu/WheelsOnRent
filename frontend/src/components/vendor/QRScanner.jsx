@@ -119,6 +119,10 @@ const QRScanner = () => {
             cancelled: 'Reject this booking? The vehicle will become available again.'
         };
 
+        if (newStatus === 'active' && bookingDetails.status === 'pending_manual_verification') {
+            if (!window.confirm('This booking requires manual DL verification. Have you verified the original DL?')) return;
+        }
+
         if (!window.confirm(confirmMessages[newStatus] || 'Update status?')) return;
 
         setLoading(true);
@@ -162,6 +166,7 @@ const QRScanner = () => {
     const getStatusStyle = (status) => {
         const map = {
             confirmed: { bg: '#dbeafe', color: '#2563eb', label: 'Confirmed' },
+            pending_manual_verification: { bg: '#fff7ed', color: '#f59e0b', label: 'Review Required' },
             active: { bg: '#dcfce7', color: '#16a34a', label: 'Active (In Ride)' },
             completed: { bg: '#ede9fe', color: '#7c3aed', label: 'Completed' },
             cancelled: { bg: '#fee2e2', color: '#dc2626', label: 'Cancelled' },
@@ -377,7 +382,7 @@ const QRScanner = () => {
                     <div style={s.card}>
                         <h4 style={{ margin: '0 0 16px 0', color: '#1e293b' }}>Actions</h4>
                         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                            {bookingDetails.status === 'confirmed' && (
+                            {(bookingDetails.status === 'confirmed' || bookingDetails.status === 'pending_manual_verification') && (
                                 <>
                                     <button
                                         onClick={() => handleUpdateStatus(bookingDetails.booking_id, 'active')}

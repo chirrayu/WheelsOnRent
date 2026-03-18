@@ -229,7 +229,7 @@ def verify_qr(vendor_id):
             pass # Skip time check if format is unknown
 
         # 3. Check status
-        allowed_statuses = ['confirmed', 'active', 'Upcoming']
+        allowed_statuses = ['confirmed', 'active', 'Upcoming', 'pending_manual_verification']
         current_status = booking.get('status')
         if current_status not in allowed_statuses:
             return jsonify({
@@ -298,6 +298,7 @@ def update_ride_status(vendor_id):
         valid_transitions = {
             'confirmed': ['active', 'cancelled'],
             'Upcoming': ['active', 'cancelled'],
+            'pending_manual_verification': ['active', 'cancelled'],
             'active': ['completed', 'cancelled'],
             'completed': [], # Terminal state
             'cancelled': []  # Terminal state
@@ -309,6 +310,11 @@ def update_ride_status(vendor_id):
         update_fields = {'status': new_status}
         if new_status == 'active':
             update_fields['ride_started_at'] = datetime.now(timezone.utc)
+            # Make vehicle unavailable while ride is active
+            db.vehicles.update_one(
+                {'_id': ObjectId(booking['vehicle_id'])},
+                {'$set': {'is_available': False}}
+            )
         elif new_status == 'completed':
             ride_completed_at = datetime.now(timezone.utc)
             update_fields['ride_completed_at'] = ride_completed_at

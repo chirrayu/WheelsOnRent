@@ -49,13 +49,23 @@ const DLUploadWidget = ({ onVerificationComplete }) => {
                 if (onVerificationComplete) onVerificationComplete(true, data.extracted_data);
             } else {
                 // If status is 'pending' or 'flagged', consider it a partial success/manual review
-                setStatus('success');
-                setExtractedData({
-                    ...data.extracted_data,
-                    isFlagged: true,
-                    msg: data.validation_message
-                });
-                if (onVerificationComplete) onVerificationComplete(true, data.extracted_data);
+                // NEW: Specifically check if it's an 'Invalid Document' vs just 'Flagged for review'
+                const isInvalid = data.validation_message && data.validation_message.includes("Invalid document");
+                
+                if (isInvalid) {
+                    setStatus('error');
+                    setErrorMsg(data.validation_message);
+                    window.alert("❌ INVALID DOCUMENT\n\n" + data.validation_message);
+                    if (onVerificationComplete) onVerificationComplete(false, null);
+                } else {
+                    setStatus('success');
+                    setExtractedData({
+                        ...data.extracted_data,
+                        isFlagged: true,
+                        msg: data.validation_message
+                    });
+                    if (onVerificationComplete) onVerificationComplete(true, data.extracted_data);
+                }
             }
 
         } catch (err) {

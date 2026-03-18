@@ -187,7 +187,8 @@ def login_user():
                     'phone': vendor['phone'],
                     'name': vendor['name'],
                     'role': vendor.get('role', 'vendor'),
-                    'email': vendor.get('email', '')
+                    'email': vendor.get('email', ''),
+                    'location_id': vendor.get('location_id', '')
                 }
             }), 200)
             response.set_cookie(
