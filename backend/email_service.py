@@ -1,12 +1,27 @@
 from config import Config
 import resend
+import threading
 
-resend.api_key = Config.RESEND_APIKEY 
+resend.api_key = Config.RESEND_APIKEY
+
+
+def _send_email_async(params, label="Email"):
+    """Send email in a background thread to avoid blocking the API."""
+    def _send():
+        try:
+            email_response = resend.Emails.send(params)
+            print(f"✅ {label} sent successfully. ID: {email_response.id}")
+        except Exception as e:
+            print(f"❌ Error sending {label}: {str(e)}")
+    
+    thread = threading.Thread(target=_send, daemon=True)
+    thread.start()
+
 
 def otp_sending_function(email, OTP):
     try:
         params = {
-            "from": "onboarding@resend.dev",  # Using Resend's sandbox domain
+            "from": "WheelsOnRent <onboarding@wheelsonrentroad.com>",
             "to": [email],
             "subject": "OTP Verification for WheelsOnRent",
             "html": f"""
@@ -69,27 +84,31 @@ def otp_sending_function(email, OTP):
       </table>
     </td>
   </tr>
-</table>
-"""
+  </table>
+  """
         }
 
-        email_response = resend.Emails.send(params)
-        print(f"OTP email sent successfully. ID: {email_response.id}")
+        _send_email_async(params, "OTP email")
         return True
     except Exception as e:
-        print(f"Error sending OTP email: {str(e)}")
-        # Return True to allow registration to continue even if email fails
-        return True
+        print(f"Error preparing OTP email: {str(e)}")
+        return False
 
 
-def ride_confirm_qr(email, QR_CODE, BOOKING_ID, PICKUP_DATE):
+import base64
+
+def ride_confirm_qr(email, QR_CODE_BASE64, BOOKING_ID, PICKUP_DATE):
     try:
+        # If the QR code string contains the data URI prefix, strip it
+        if "," in QR_CODE_BASE64:
+            QR_CODE_BASE64 = QR_CODE_BASE64.split(",")[1]
+        
         params = {
-            "from": "onboarding@resend.dev",  # Using Resend's sandbox domain
+            "from": "WheelsOnRent <onboarding@wheelsonrentroad.com>",
             "to": [email],
             "subject": "Ride Confirmation for WheelsOnRent",
             "html": f"""
-<table width="100%" border="0" cellspacing="0" cellpadding="0"
+  <table width="100%" border="0" cellspacing="0" cellpadding="0"
   style="padding:40px 20px; background-color:#f5f3ff;">
   <tr>
     <td align="center">
@@ -129,7 +148,7 @@ def ride_confirm_qr(email, QR_CODE, BOOKING_ID, PICKUP_DATE):
           <td align="center" style="padding:20px 40px;">
             <div style="background:#faf5ff; border:1px solid #e9d5ff;
                         border-radius:14px; padding:25px;">
-              <img src="{QR_CODE}" alt="Booking QR Code"
+              <img src="cid:qrcode" alt="Booking QR Code"
                 style="width:180px; height:180px; display:block; margin:auto;" />
             </div>
           </td>
@@ -173,23 +192,29 @@ def ride_confirm_qr(email, QR_CODE, BOOKING_ID, PICKUP_DATE):
       </table>
     </td>
   </tr>
-</table>
+  </table>
 
-"""
+  """,
+            "attachments": [
+                {
+                    "content": list(base64.b64decode(QR_CODE_BASE64)),
+                    "filename": "qrcode.png",
+                    "content_id": "qrcode"
+                }
+            ]
         }
 
-        email_response = resend.Emails.send(params)
-        print(f"Booking confirmation email sent successfully. ID: {email_response.id}")
+        _send_email_async(params, "Booking confirmation email")
         return True
     except Exception as e:
-        print(f"Error sending booking confirmation email: {str(e)}")
+        print(f"Error preparing booking confirmation email: {str(e)}")
         return False
 
 
 def password_reset(email, RESET_LINK):
     try:
         params = {
-            "from": "onboarding@resend.dev",  # Using Resend's sandbox domain
+            "from": "WheelsOnRent <onboarding@wheelsonrentroad.com>",
             "to": [email],
             "subject": "Password Reset for WheelsOnRent",
             "html": f"""
@@ -246,7 +271,7 @@ def password_reset(email, RESET_LINK):
         <tr>
           <td style="padding:0 40px 20px; text-align:center; font-size:12px; color:#9ca3af;">
             <p style="margin:0 0 10px;">
-              If the button doesn’t work, copy and paste this link into your browser:
+              If the button doesn't work, copy and paste this link into your browser:
             </p>
             <p style="word-break:break-all; color:#6b21a8;">
               {RESET_LINK}
@@ -280,9 +305,8 @@ def password_reset(email, RESET_LINK):
 """
         }
 
-        email_response = resend.Emails.send(params)
-        print(f"Password reset email sent successfully. ID: {email_response.id}")
+        _send_email_async(params, "Password reset email")
         return True
     except Exception as e:
-        print(f"Error sending password reset email: {str(e)}")
+        print(f"Error preparing password reset email: {str(e)}")
         return False

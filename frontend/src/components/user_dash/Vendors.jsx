@@ -17,6 +17,9 @@ const Vendors = () => {
   // Error Popup State
   const [showErrorPopup, setShowErrorPopup] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  
+  // Submit State
+  const [isBooking, setIsBooking] = useState(false);
 
   // Form State
   const [bookingData, setBookingData] = useState({
@@ -113,6 +116,8 @@ const Vendors = () => {
     const randomIndex = Math.floor(Math.random() * availableVehicles.length);
     const assignedVehicle = availableVehicles[randomIndex];
 
+    setIsBooking(true);
+
     try {
       // Start date is now, end date is TBD (calculated on return)
       const now = new Date().toISOString();
@@ -146,6 +151,8 @@ const Vendors = () => {
     } catch (err) {
       setErrorMessage("Network error occurred.");
       setShowErrorPopup(true);
+    } finally {
+      setIsBooking(false);
     }
   };
 
@@ -265,9 +272,22 @@ const Vendors = () => {
           <div style={styles.stepContainer}>
             <h3>Upload Driving License</h3>
             <div style={styles.formGroup}>
-              <label>Upload DL Image</label>
-              <input type="file" onChange={e => setBookingData({ ...bookingData, dlFile: e.target.files[0] })} style={styles.input} />
-              <p style={{ fontSize: '0.8rem', color: '#666', marginTop: '5px' }}>Please upload a clear image of your valid Driving License.</p>
+              <label>Upload DL Image/PDF</label>
+              <input
+                type="file"
+                accept="image/*,.pdf"
+                onChange={e => {
+                  const file = e.target.files[0];
+                  if (file && !file.type.startsWith('image/') && file.type !== 'application/pdf') {
+                    alert('Please upload an image or PDF file');
+                    e.target.value = '';
+                    return;
+                  }
+                  setBookingData({ ...bookingData, dlFile: file });
+                }}
+                style={styles.input}
+              />
+              <p style={{ fontSize: '0.8rem', color: '#666', marginTop: '5px' }}>Please upload a clear image or PDF of your valid Driving License.</p>
             </div>
             <div style={styles.modalActions}>
               <button onClick={() => setStep(1)} style={styles.backBtn}>Back</button>
@@ -299,8 +319,10 @@ const Vendors = () => {
               <label htmlFor="noc-agree">I agree to the terms and conditions</label>
             </div>
             <div style={styles.modalActions}>
-              <button onClick={() => setStep(2)} style={styles.backBtn}>Back</button>
-              <button disabled={!bookingData.agreedToTerms} onClick={handleCreateBooking} style={styles.confirmBtn}>Confirm Booking</button>
+              <button onClick={() => setStep(2)} style={styles.backBtn} disabled={isBooking}>Back</button>
+              <button disabled={!bookingData.agreedToTerms || isBooking} onClick={handleCreateBooking} style={styles.confirmBtn}>
+                {isBooking ? 'Confirming...' : 'Confirm Booking'}
+              </button>
             </div>
           </div>
         );

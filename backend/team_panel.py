@@ -2,7 +2,7 @@ from database import get_db
 from flask import request, jsonify
 import jwt
 import bcrypt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from bson import ObjectId
 import traceback
 from config import Config
@@ -50,7 +50,7 @@ def add_vendor():
             'location_id': location_id,
             'role': 'vendor',
             'is_active': True,
-            'created_at': datetime.utcnow(),
+            'created_at': datetime.now(timezone.utc),
             'last_login': None
         }
 
@@ -66,7 +66,7 @@ def add_vendor():
     except Exception as e:
         print(f"Add vendor error: {str(e)}")
         print(traceback.format_exc())
-        return jsonify({'error': f'Adding vendor failed: {str(e)}'}), 500
+        return jsonify({'error': 'Adding vendor failed. Please try again.'}), 500
 
 
 def get_all_vendors():
@@ -76,8 +76,8 @@ def get_all_vendors():
     try:
         db = get_db()
         
-        # Fetch all vendors
-        vendors_cursor = db.vendors.find({})
+        # Fetch all vendors (Excluding password from DB)
+        vendors_cursor = db.vendors.find({}, {'password': 0})
         vendors = []
         
         for vendor in vendors_cursor:
@@ -95,7 +95,7 @@ def get_all_vendors():
     except Exception as e:
         print(f"Get vendors error: {str(e)}")
         print(traceback.format_exc())
-        return jsonify({'error': f'Getting vendors failed: {str(e)}'}), 500
+        return jsonify({'error': 'Getting vendors failed. Please try again.'}), 500
 
 
 def update_vendor(vendor_id):
@@ -122,7 +122,7 @@ def update_vendor(vendor_id):
         # Check if phone already exists for another vendor
         if 'phone' in update_fields:
             existing_vendor = db.vendors.find_one({
-                'phone': update_fields['phone'],
+                'phone': str(update_fields['phone']),
                 '_id': {'$ne': ObjectId(vendor_id)}
             })
             if existing_vendor:
@@ -142,7 +142,7 @@ def update_vendor(vendor_id):
     except Exception as e:
         print(f"Update vendor error: {str(e)}")
         print(traceback.format_exc())
-        return jsonify({'error': f'Updating vendor failed: {str(e)}'}), 500
+        return jsonify({'error': 'Updating vendor failed. Please try again.'}), 500
 
 
 def delete_vendor(vendor_id):
@@ -163,7 +163,7 @@ def delete_vendor(vendor_id):
     except Exception as e:
         print(f"Delete vendor error: {str(e)}")
         print(traceback.format_exc())
-        return jsonify({'error': f'Deleting vendor failed: {str(e)}'}), 500
+        return jsonify({'error': 'Deleting vendor failed. Please try again.'}), 500
 
 
 def vendor_login():
@@ -179,8 +179,8 @@ def vendor_login():
         if not phone or not password:
             return jsonify({'error': 'Phone number and password are required'}), 400
 
-        # Find vendor in database by phone
-        vendor = db.vendors.find_one({'phone': phone})
+        # Find vendor in database by phone - CAST TO STRING
+        vendor = db.vendors.find_one({'phone': str(phone)})
         if not vendor:
             return jsonify({'error': 'Invalid credentials'}), 401
 
@@ -195,15 +195,17 @@ def vendor_login():
         # Update last login time
         db.vendors.update_one(
             {'_id': vendor['_id']},
-            {'$set': {'last_login': datetime.utcnow()}}
+            {'$set': {'last_login': datetime.now(timezone.utc)}}
         )
 
         # Generate JWT token
+        token_version = vendor.get('token_version', 0)
         token = jwt.encode({
             'vendor_id': str(vendor['_id']),
             'phone': vendor['phone'],
             'role': vendor.get('role', 'vendor'),
-            'exp': datetime.utcnow() + timedelta(hours=24)
+            'token_version': token_version,
+            'exp': datetime.now(timezone.utc) + timedelta(hours=24)
         }, Config.SECRET_KEY, algorithm='HS256')
 
         return jsonify({
@@ -215,14 +217,15 @@ def vendor_login():
                 'name': vendor['name'],
                 'username': vendor.get('username', ''),
                 'email': vendor.get('email', ''),
-                'role': vendor.get('role', 'vendor')
+                'role': vendor.get('role', 'vendor'),
+                'location_id': vendor.get('location_id', '')
             }
         }), 200
 
     except Exception as e:
         print(f"Vendor login error: {str(e)}")
         print(traceback.format_exc())
-        return jsonify({'error': f'Login failed: {str(e)}'}), 500
+        return jsonify({'error': 'Login failed. Please try again.'}), 500
 
 
 def get_all_team_members():
@@ -232,8 +235,8 @@ def get_all_team_members():
     try:
         db = get_db()
         
-        # Fetch all team members
-        team_cursor = db.teams.find({})
+        # Fetch all team members (Excluding password from DB)
+        team_cursor = db.teams.find({}, {'password': 0})
         team_members = []
         
         for member in team_cursor:
@@ -251,4 +254,4 @@ def get_all_team_members():
     except Exception as e:
         print(f"Get team members error: {str(e)}")
         print(traceback.format_exc())
-        return jsonify({'error': f'Getting team members failed: {str(e)}'}), 500
+        return jsonify({'error': 'Getting team members failed. Please try again.'}), 500

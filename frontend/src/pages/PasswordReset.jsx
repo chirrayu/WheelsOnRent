@@ -1,30 +1,25 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import API_BASE_URL from '../apiConfig';
 import './PasswordReset.css';
 
 const PasswordReset = () => {
-  const [searchParams] = useSearchParams();
+  const [phone, setPhone] = useState('');
+  const [resetCode, setResetCode] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
-  const [tokenValid, setTokenValid] = useState(true);
   const navigate = useNavigate();
-
-  const resetToken = searchParams.get('token');
-
-  useEffect(() => {
-    // Validate the reset token when component loads
-    if (!resetToken) {
-      setError('Invalid or missing reset token');
-      setTokenValid(false);
-    }
-  }, [resetToken]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!phone || !resetCode) {
+      setError('Phone number and reset code are required');
+      return;
+    }
 
     if (password !== confirmPassword) {
       setError('Passwords do not match');
@@ -47,7 +42,8 @@ const PasswordReset = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          reset_token: resetToken,
+          phone: phone,
+          reset_code: resetCode,
           new_password: password
         })
       });
@@ -56,8 +52,6 @@ const PasswordReset = () => {
 
       if (response.ok) {
         setSuccess(data.message || 'Password has been reset successfully! Redirecting to login...');
-
-        // Redirect to login after a delay
         setTimeout(() => {
           navigate('/login');
         }, 3000);
@@ -72,25 +66,6 @@ const PasswordReset = () => {
     }
   };
 
-  if (!tokenValid) {
-    return (
-      <div className="password-reset-page">
-        <div className="password-reset-container">
-          <h2>Invalid Token</h2>
-          <div className="alert alert-error">
-            The password reset link is invalid or has expired. Please request a new link.
-          </div>
-          <button
-            className="btn btn-primary"
-            onClick={() => navigate('/login')}
-          >
-            Go to Login
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="password-reset-page">
       <div className="password-reset-container">
@@ -100,6 +75,35 @@ const PasswordReset = () => {
         {success && <div className="alert alert-success">{success}</div>}
 
         <form className="password-reset-form" onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label htmlFor="phone">Phone Number:</label>
+            <input
+              type="tel"
+              id="phone"
+              name="phone"
+              className="form-control"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="Enter your registered phone number"
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="resetCode">Reset Code:</label>
+            <input
+              type="text"
+              id="resetCode"
+              name="resetCode"
+              className="form-control"
+              value={resetCode}
+              onChange={(e) => setResetCode(e.target.value)}
+              placeholder="Enter the 6-digit code sent to your email"
+              maxLength="6"
+              required
+            />
+          </div>
+
           <div className="form-group">
             <label htmlFor="password">New Password:</label>
             <input

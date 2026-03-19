@@ -89,8 +89,10 @@ const Booking_History = () => {
     switch (status) {
       case 'confirmed': return '#3b82f6';
       case 'active': return '#10b981';
+      case 'Upcoming': return '#f59e0b';
       case 'completed': return '#6366f1';
       case 'cancelled': return '#ef4444';
+      case 'pending_manual_verification': return '#8b5cf6';
       default: return '#64748b';
     }
   };
@@ -99,8 +101,10 @@ const Booking_History = () => {
     switch (status) {
       case 'confirmed': return '✅';
       case 'active': return '🚗';
+      case 'Upcoming': return '⏳';
       case 'completed': return '🏁';
       case 'cancelled': return '❌';
+      case 'pending_manual_verification': return '🔍';
       default: return '📋';
     }
   };
@@ -205,7 +209,7 @@ const Booking_History = () => {
 
               {/* Action buttons */}
               <div style={styles.actionRow}>
-                {(booking.status === 'confirmed' || booking.status === 'active') && (
+                {(booking.status === 'confirmed' || booking.status === 'active' || booking.status === 'Upcoming') && (
                   <button
                     onClick={() => handleShowQR(booking._id)}
                     style={styles.qrBtn}
@@ -213,7 +217,7 @@ const Booking_History = () => {
                     📱 Show QR Code
                   </button>
                 )}
-                {booking.status === 'confirmed' && (
+                {(booking.status === 'confirmed' || booking.status === 'Upcoming') && (
                   <button
                     onClick={() => handleCancelBooking(booking._id)}
                     style={styles.cancelBtn}
