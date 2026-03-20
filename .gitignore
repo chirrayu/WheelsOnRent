@@ -91,3 +91,10 @@ Thumbs.db
 *.bak
 *.backup
 *~
+
+
+.pyre_configuration
+CASE STUDY ANALYSIS.docx
+Procfile
+deploy_ec2.sh
+verify_availability_fix.py
