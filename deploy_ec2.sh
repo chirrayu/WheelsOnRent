@@ -10,26 +10,19 @@ if [ ! -f "backend/.env" ]; then
     exit 1
 fi
 
-# 2. Build Backend Docker Image
-echo "📦 Building Backend Docker Image..."
-cd backend
-docker build -t wheelsonrent-backend .
-cd ..
+# 2. Start Full Stack with Docker Compose
+echo "📦 Building and Starting Stack with Docker Compose..."
+docker compose build --no-cache
+docker compose up -d
 
-# 3. Build Frontend
-echo "🏗️  Building Frontend Production Bundle..."
-cd frontend
-npm install
-npm run build
-cd ..
-
-# 4. Deployment Instructions
+# 3. Deployment Instructions
 echo ""
 echo "✅ Preparation Complete!"
 echo "--------------------------------------------------"
-echo "Next Steps for EC2:"
-echo "1. Start Backend: docker run -d -p 5000:5000 --env-file backend/.env wheelsonrent-backend"
-echo "2. Serve Frontend: Use Nginx to serve the 'frontend/dist' folder."
-echo "3. Security: Open ports 80 (HTTP), 443 (HTTPS), and 5000 (API) in EC2 Security Group."
-echo "4. Domain: Update FRONTEND_URL in backend/.env to your domain name."
+echo "Next Steps for EC2 Backend Deployment:"
+echo "1. Status Check: docker compose ps"
+echo "2. Logs: docker compose logs -f backend"
+echo "3. Security: Open port 5000 (API) in EC2 Security Group."
+echo "4. Frontend: Ensure your external frontend (e.g. Vercel) can reach http://your-ec2-ip:5000"
+echo "5. CORS: Set FRONTEND_URL in backend/.env to your frontend's domain."
 echo "--------------------------------------------------"
