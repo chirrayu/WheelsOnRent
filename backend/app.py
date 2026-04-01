@@ -534,10 +534,13 @@ if __name__ == '__main__':
     # Use debug mode only in development
     debug_mode = Config.ENV == "development"
     
+    # Azure App Service and other cloud providers inject the port via environment variable
+    port = int(os.environ.get("PORT", 8000))
+    
     socketio.run(
         app, 
         host='0.0.0.0', 
-        port=5000, 
+        port=port, 
         debug=debug_mode,
         allow_unsafe_werkzeug=debug_mode  # Required for Flask-SocketIO in debug
     )
