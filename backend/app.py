@@ -58,7 +58,13 @@ app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB limit for security
 # Enhanced CORS configuration
 CORS(app, 
      resources={r"/*": {
-         "origins": [Config.FRONTEND_URL, "http://localhost:3000", "http://localhost:5173"],
+         "origins": [
+             Config.FRONTEND_URL, 
+             "http://localhost:3000", 
+             "http://localhost:5173", 
+             "https://wheelsonrentroad.com", 
+             "https://www.wheelsonrentroad.com"
+         ],
          "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
          "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
          "expose_headers": ["Content-Type", "Authorization"],

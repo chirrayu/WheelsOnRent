@@ -176,56 +176,24 @@ def create_booking(user_id):
         rate = vehicle.get('daily_rate', 0) if booking_type == 'daily' else vehicle.get('hourly_rate', 0)
         print(f"DEBUG: Calculated rate: {rate} for type: {booking_type}")
         
-        # Save DL file if provided
+        # Save DL file if provided — upload to S3, auto-confirm (no OCR)
         dl_image_path = None
         dl_verification_status = 'not_provided'
-        dl_extraction_data = {}
 
         if 'dl_file' in request.files:
             dl_file = request.files['dl_file']
             if dl_file.filename:
-                # ... sync OCR ...
                 try:
-                    # 1. Read Bytes for scanning BEFORE upload
-                    file_bytes = dl_file.read()
-                    dl_file.seek(0)
-
-                    # 2. Synchronous OCR for date validation (Safety first)
-                    print("DEBUG: Performing synchronous DL validation...")
-                    from dl_service import verify_dl_image
-                    from dl_validator import validate_dl_dates
-                    
-                    val_status, val_msg, extraction = verify_dl_image(image_bytes=file_bytes)
-                    
-                    if val_status == 'verified' and extraction.get('identified', {}).get('expiry'):
-                        expiry_date = extraction['identified']['expiry']
-                        dob_date = extraction['identified'].get('dob')
-                        
-                        # Validate dates (Age and Expiry)
-                        is_valid_dates, date_err = validate_dl_dates(dob_date if dob_date else "2000-01-01", expiry_date)
-                        if not is_valid_dates:
-                            log_security_event('BOOKING_BLOCKED_DL', {'user_id': user_id, 'reason': date_err}, severity='WARNING')
-                            return jsonify({'error': f'Booking blocked: {date_err}'}), 400
-                    
-                    # 3. S3 Upload (If scan passed or requires manual review)
                     dl_image_path = upload_to_s3(dl_file)
                     if not dl_image_path:
                         return jsonify({'error': 'Failed to upload DL image.'}), 400
-                    
-                    dl_verification_status = val_status
-                    dl_extraction_data = extraction
-                    print(f"DEBUG: DL Verification Result: {val_status}. Path: {dl_image_path}")
+                    dl_verification_status = 'verified'
+                    print(f"DEBUG: DL uploaded to S3. Path: {dl_image_path}")
                 except Exception as upload_err:
-                    print(f"ERROR: DL validation/upload Exception: {str(upload_err)}")
-                    return jsonify({'error': f'Failed to process Driving License: {str(upload_err)}'}), 500
+                    print(f"ERROR: DL upload failed: {str(upload_err)}")
+                    return jsonify({'error': 'Failed to upload Driving License. Please try again.'}), 500
 
-        # Determine initial booking status
-        # If OCR flagged it, we might want manual review before 'confirmed'
-        # BUT if it's completely invalid (e.g. not even a DL), we block it immediately.
-        if dl_verification_status == 'flagged' and "Invalid document" in str(val_msg):
-            return jsonify({'error': val_msg}), 400
-
-        booking_status = 'confirmed' if dl_verification_status != 'flagged' else 'pending_manual_verification'
+        booking_status = 'confirmed'
 
         # Create booking document
         new_booking = {
@@ -239,7 +207,6 @@ def create_booking(user_id):
             'status': booking_status,
             'dl_image': dl_image_path,
             'dl_verification_status': dl_verification_status,
-            'dl_ocr_data': dl_extraction_data,
             'noc_agreed': True,
             'created_at': datetime.now(timezone.utc)
         }
