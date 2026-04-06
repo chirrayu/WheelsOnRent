@@ -1,0 +1,74 @@
+# ============================================================
+# WheelsOnRent — Production Docker Compose (EC2 / t3.micro)
+# ============================================================
+# Usage:
+#   docker compose -f docker-compose.prod.yml build --no-cache
+#   docker compose -f docker-compose.prod.yml up -d
+#   docker compose -f docker-compose.prod.yml logs -f backend
+# ============================================================
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: wheelsonrent-backend
+    ports:
+      - "127.0.0.1:5000:5000"   # Loopback ONLY — Nginx proxies to this
+    env_file:
+      - ./backend/.env
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 768M          # Hard cap — prevents OOM-killing the host
+        reservations:
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s         # EasyOCR model loading takes time on first boot
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:7-alpine
+    container_name: wheelsonrent-redis
+    expose:
+      - "6379"                  # Internal only — not exposed to host
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 32M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+    command: redis-server --maxmemory 64mb --maxmemory-policy allkeys-lru
+
+volumes:
+  redis_data:
+    driver: local
+
+networks:
+  default:
+    name: wheelsonrent-network

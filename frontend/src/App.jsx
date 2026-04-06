@@ -9,6 +9,7 @@ const MyTeamPanel = lazy(() => import('./pages/MyTeamPanel'));
 const PasswordReset = lazy(() => import('./pages/PasswordReset'));
 const AddVendor = lazy(() => import('./pages/AddVendor'));
 const VendorPanel = lazy(() => import('./pages/VendorPanel'));
+const Landing = lazy(() => import('./pages/Landing'));
 
 // Loading Screen Component
 const LoadingScreen = () => (
@@ -132,7 +133,7 @@ function App() {
     <AuthProvider>
       <Suspense fallback={<LoadingScreen />}>
         <Routes>
-          <Route path="/" element={<Login />} />
+          <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Registration />} />
           <Route path="/reset-password" element={<PasswordReset />} />
